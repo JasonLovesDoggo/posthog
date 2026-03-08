@@ -197,6 +197,7 @@ export const workflowLogic = kea<workflowLogicType>([
         }),
         softDeleteAction: (actionId: string) => ({ actionId }),
         restoreAction: (actionId: string) => ({ actionId }),
+        updateWorkflowStatus: (status: HogFlow['status']) => ({ status }),
         discardChanges: true,
         publishDraft: true,
         discardDraft: true,
@@ -321,6 +322,10 @@ export const workflowLogic = kea<workflowLogicType>([
         },
     })),
     reducers({
+        originalWorkflow: {
+            updateWorkflowStatus: (state: HogFlow | null, { status }: { status: HogFlow['status'] }) =>
+                state ? ({ ...state, status } as HogFlow) : state,
+        },
         localDeletedActionIds: [
             new Set<string>() as Set<string>,
             {
@@ -565,14 +570,16 @@ export const workflowLogic = kea<workflowLogicType>([
         saveWorkflowPartial: async ({ workflow }) => {
             const merged = { ...values.workflow, ...workflow }
 
-            // Status-only change (enable/disable): bypass draft flow, update HogFlow directly
+            // Status-only change (enable/disable): bypass draft flow, update HogFlow directly.
+            // Only update the status fields — don't re-hydrate/reset the canvas.
             if (workflow.status && Object.keys(workflow).length === 1 && props.id && props.id !== 'new') {
                 if (workflow.status === 'active' && values.workflowHasActionErrors) {
                     lemonToast.error('Fix all errors before enabling')
                     return
                 }
-                const result = await api.hogFlows.updateHogFlow(props.id, { status: workflow.status })
-                actions.loadWorkflowSuccess(result)
+                await api.hogFlows.updateHogFlow(props.id, { status: workflow.status })
+                actions.updateWorkflowStatus(workflow.status)
+                actions.setWorkflowValue('status', workflow.status)
                 return
             }
 
