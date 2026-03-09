@@ -49,6 +49,8 @@ DEFAULT_USER_COST_LIMITS: dict[str, "UserCostLimit"] = {
 
 _COST_LIMIT_KEY_ALIASES: dict[str, str] = {
     "array": "posthog_code",
+    "twig": "posthog_code",
+    "slack-twig": "slack-posthog-code",
 }
 
 

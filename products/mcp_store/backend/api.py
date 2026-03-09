@@ -104,7 +104,7 @@ def _is_https(url: str) -> bool:
 def _is_valid_posthog_code_callback_url(url: str) -> bool:
     """Validate that a PostHog Code callback URL is safe to redirect to (prevents open redirect)."""
     parsed = urlparse(url)
-    if parsed.scheme in ("array", "posthog-code"):
+    if parsed.scheme in ("array", "twig", "posthog-code"):
         return True
     if is_dev_mode() and parsed.scheme == "http" and parsed.hostname == "localhost":
         return True
