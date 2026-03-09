@@ -18,8 +18,6 @@ class ProductConfig:
 # OAuth application IDs per region
 POSTHOG_CODE_US_APP_ID = "019a3066-4aa2-0000-ca70-48ecdcc519cf"
 POSTHOG_CODE_EU_APP_ID = "019a3067-5be7-0000-33c7-c6743eb59a79"
-TWIG_US_APP_ID = POSTHOG_CODE_US_APP_ID
-TWIG_EU_APP_ID = POSTHOG_CODE_EU_APP_ID
 WIZARD_US_APP_ID = "019a0c79-b69d-0000-f31b-b41345208c9d"
 WIZARD_EU_APP_ID = "019a12d0-6edd-0000-0458-86616af3a3db"
 
@@ -70,7 +68,7 @@ PRODUCTS: Final[dict[str, ProductConfig]] = {
         allowed_models=None,
         allow_api_keys=True,
     ),
-    "slack-twig": ProductConfig(
+    "slack-posthog-code": ProductConfig(
         allowed_application_ids=None,
         allowed_models=frozenset({"claude-haiku-4-5"}),
         allow_api_keys=True,
@@ -102,7 +100,6 @@ ALLOWED_PRODUCTS: Final[frozenset[str]] = frozenset(PRODUCTS.keys())
 
 PRODUCT_ALIASES: Final[dict[str, str]] = {
     "array": "posthog_code",
-    "twig": "posthog_code",
 }
 
 

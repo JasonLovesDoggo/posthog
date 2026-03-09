@@ -53,7 +53,7 @@ from .serializers import (
     TaskSerializer,
 )
 from .services.connection_token import create_sandbox_connection_token
-from .temporal.client import execute_task_processing_workflow, execute_twig_agent_relay_workflow
+from .temporal.client import execute_task_processing_workflow, execute_posthog_code_agent_relay_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -492,7 +492,7 @@ class TaskRunViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet):
             return Response({"status": "skipped"})
 
         try:
-            relay_id = execute_twig_agent_relay_workflow(
+            relay_id = execute_posthog_code_agent_relay_workflow(
                 run_id=str(task_run.id),
                 text=text,
                 delete_progress=True,

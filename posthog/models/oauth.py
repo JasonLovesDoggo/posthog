@@ -29,7 +29,7 @@ class OAuthApplicationAccessLevel(enum.Enum):
 
 class OAuthApplicationAuthBrand(enum.Enum):
     POSTHOG = "posthog"
-    TWIG = "twig"
+    POSTHOG_CODE = "posthog-code"
 
 
 def is_loopback_host(hostname: str | None) -> bool:
@@ -92,7 +92,7 @@ class OAuthApplication(AbstractApplication):
                 raise ValidationError({"redirect_uris": f"Redirect URI {uri} cannot contain fragments"})
 
             # Custom URL schemes for native apps (RFC 8252 Section 7.1)
-            # These look like: myapp://callback, twig://oauth
+            # These look like: myapp://callback, posthog-code://oauth
             is_custom_scheme = parsed_uri.scheme not in ["http", "https", ""]
 
             if is_custom_scheme:

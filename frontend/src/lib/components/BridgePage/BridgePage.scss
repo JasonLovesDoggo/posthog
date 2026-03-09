@@ -152,7 +152,7 @@
         }
     }
 
-    &.BridgePage--twig {
+    &.BridgePage--posthog-code {
         --primary-3000-button-bg: #2f2a26;
         --primary-3000-button-border: #2f2a26;
         --primary-3000-button-border-hover: #241f1c;
@@ -161,7 +161,7 @@
         --text-3000-light: #f4efe6;
 
         background-color: #f4efe6;
-        background-image: var(--twig-auth-bg, none);
+        background-image: var(--posthog-code-auth-bg, none);
         background-position: center;
         background-size: cover;
 

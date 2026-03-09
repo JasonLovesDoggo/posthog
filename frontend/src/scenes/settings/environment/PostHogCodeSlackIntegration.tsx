@@ -6,21 +6,21 @@ import api from 'lib/api'
 import { integrationsLogic } from 'lib/integrations/integrationsLogic'
 import { IntegrationView } from 'lib/integrations/IntegrationView'
 
-export function TwigSlackIntegration(): JSX.Element {
-    const { twigSlackIntegrations, twigSlackAvailable } = useValues(integrationsLogic)
+export function PostHogCodeSlackIntegration(): JSX.Element {
+    const { posthogCodeSlackIntegrations, posthogCodeSlackAvailable } = useValues(integrationsLogic)
 
     return (
         <div>
-            <p>Connect Slack to Twig to kick off tasks like pull requests directly from Slack.</p>
+            <p>Connect Slack to PostHog Code to kick off tasks like pull requests directly from Slack.</p>
 
             <div className="deprecated-space-y-2">
-                {twigSlackIntegrations?.map((integration) => (
+                {posthogCodeSlackIntegrations?.map((integration) => (
                     <IntegrationView key={integration.id} integration={integration} />
                 ))}
 
                 <div>
-                    {twigSlackAvailable ? (
-                        <Link to={api.integrations.authorizeUrl({ kind: 'slack-twig' })} disableClientSideRouting>
+                    {posthogCodeSlackAvailable ? (
+                        <Link to={api.integrations.authorizeUrl({ kind: 'slack-posthog-code' })} disableClientSideRouting>
                             <img
                                 alt="Add to Slack"
                                 height="40"
@@ -31,7 +31,7 @@ export function TwigSlackIntegration(): JSX.Element {
                         </Link>
                     ) : (
                         <p className="text-secondary">
-                            The Twig Slack integration is not configured for this instance.
+                            The PostHog Code Slack integration is not configured for this instance.
                         </p>
                     )}
                 </div>

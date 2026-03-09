@@ -4,9 +4,9 @@ import type { ReactNode } from 'react'
 import { BridgePage } from 'lib/components/BridgePage/BridgePage'
 import { preflightLogic } from 'scenes/PreflightCheck/preflightLogic'
 
-import twigAuthBg from 'public/twig-auth-bg.png'
+import posthogCodeAuthBg from 'public/posthog-code-auth-bg.png'
 
-import { TwigAuthLeftPanel } from './TwigAuthLeftPanel'
+import { PostHogCodeAuthLeftPanel } from './PostHogCodeAuthLeftPanel'
 
 interface AuthShellProps {
     view: string
@@ -18,7 +18,7 @@ interface AuthShellProps {
     fixedWidth?: boolean
     sideLogo?: boolean
     showHedgehog?: boolean
-    hideFooterForTwig?: boolean
+    hideFooterForPostHogCode?: boolean
 }
 
 export function AuthShell({
@@ -31,24 +31,24 @@ export function AuthShell({
     fixedWidth,
     sideLogo,
     showHedgehog,
-    hideFooterForTwig,
+    hideFooterForPostHogCode,
 }: AuthShellProps): JSX.Element {
     const { preflight } = useValues(preflightLogic)
-    const isTwig = preflight?.auth_brand === 'twig'
+    const isPostHogCode = preflight?.auth_brand === 'posthog-code'
 
-    if (isTwig) {
+    if (isPostHogCode) {
         return (
             <BridgePage
                 view={view}
                 noLogo
-                theme="twig"
+                theme="posthog-code"
                 header={header}
-                footer={hideFooterForTwig ? undefined : footer}
-                leftContainerContent={<TwigAuthLeftPanel />}
+                footer={hideFooterForPostHogCode ? undefined : footer}
+                leftContainerContent={<PostHogCodeAuthLeftPanel />}
                 fixedWidth={fixedWidth}
                 sideLogo={false}
                 style={{
-                    backgroundImage: `url(${twigAuthBg})`,
+                    backgroundImage: `url(${posthogCodeAuthBg})`,
                 }}
             >
                 {children}

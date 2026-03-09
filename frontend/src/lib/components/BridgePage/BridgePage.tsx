@@ -22,7 +22,7 @@ export type BridgePageCommonProps = {
     sideLogo?: boolean
     fixedWidth?: boolean
     leftContainerContent?: JSX.Element
-    theme?: 'default' | 'twig'
+    theme?: 'default' | 'posthog-code'
     style?: React.CSSProperties
 }
 
@@ -69,7 +69,7 @@ export function BridgePage({
             className={clsx(
                 'BridgePage',
                 fixedWidth && 'BridgePage--fixed-width',
-                theme === 'twig' && 'BridgePage--twig'
+                theme === 'posthog-code' && 'BridgePage--posthog-code'
             )}
             style={style}
         >

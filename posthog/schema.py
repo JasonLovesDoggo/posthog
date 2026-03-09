@@ -2254,7 +2254,7 @@ class IntegrationFilter(BaseModel):
 
 class IntegrationKind(StrEnum):
     SLACK = "slack"
-    SLACK_TWIG = "slack-twig"
+    SLACK_POSTHOG_CODE = "slack-posthog-code"
     SALESFORCE = "salesforce"
     HUBSPOT = "hubspot"
     GOOGLE_PUBSUB = "google-pubsub"
