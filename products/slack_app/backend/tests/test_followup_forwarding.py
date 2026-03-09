@@ -9,7 +9,10 @@ from posthog.models.integration import Integration
 from posthog.models.organization import Organization
 from posthog.models.team.team import Team
 from posthog.models.user import User
-from posthog.temporal.ai.posthog_code_slack_mention import PostHogCodeSlackMentionWorkflowInputs, forward_posthog_code_followup_activity
+from posthog.temporal.ai.posthog_code_slack_mention import (
+    PostHogCodeSlackMentionWorkflowInputs,
+    forward_posthog_code_followup_activity,
+)
 
 from products.slack_app.backend.models import SlackThreadTaskMapping
 

@@ -49,7 +49,11 @@ from posthog.temporal.codec_server import decode_payloads
 
 from products.early_access_features.backend.api import early_access_features
 from products.product_tours.backend.api import product_tours
-from products.slack_app.backend.api import slack_event_handler, posthog_code_event_handler, posthog_code_interactivity_handler
+from products.slack_app.backend.api import (
+    posthog_code_event_handler,
+    posthog_code_interactivity_handler,
+    slack_event_handler,
+)
 from products.tasks.backend.webhooks import github_pr_webhook
 
 from .utils import opt_slash_path, render_template

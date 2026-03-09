@@ -20,7 +20,10 @@ export function PostHogCodeSlackIntegration(): JSX.Element {
 
                 <div>
                     {posthogCodeSlackAvailable ? (
-                        <Link to={api.integrations.authorizeUrl({ kind: 'slack-posthog-code' })} disableClientSideRouting>
+                        <Link
+                            to={api.integrations.authorizeUrl({ kind: 'slack-posthog-code' })}
+                            disableClientSideRouting
+                        >
                             <img
                                 alt="Add to Slack"
                                 height="40"

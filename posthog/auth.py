@@ -4,6 +4,7 @@ import logging
 import functools
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.backends import BaseBackend

@@ -63,10 +63,7 @@ export function BridgePage({
     })
 
     return (
-        <div
-            className={clsx('BridgePage', fixedWidth && 'BridgePage--fixed-width')}
-            style={style}
-        >
+        <div className={clsx('BridgePage', fixedWidth && 'BridgePage--fixed-width')} style={style}>
             <div className="BridgePage__main">
                 {leftContainerContent || hedgehog ? (
                     <div className="BridgePage__left-wrapper">

@@ -4,6 +4,24 @@ from posthog.temporal.ai.chat_agent import (
     process_chat_agent_activity,
     process_conversation_activity,
 )
+from posthog.temporal.ai.posthog_code_slack_interactivity import (
+    PostHogCodeSlackTerminateTaskWorkflow,
+    process_posthog_code_terminate_task_activity,
+)
+from posthog.temporal.ai.posthog_code_slack_mention import (
+    PostHogCodeSlackMentionWorkflow,
+    collect_posthog_code_thread_messages_activity,
+    create_posthog_code_routing_rule_activity,
+    create_posthog_code_task_for_repo_activity,
+    forward_posthog_code_followup_activity,
+    handle_posthog_code_rules_command_activity,
+    post_posthog_code_internal_error_activity,
+    post_posthog_code_no_repos_activity,
+    post_posthog_code_picker_timeout_activity,
+    post_posthog_code_repo_picker_activity,
+    resolve_posthog_code_slack_user_activity,
+    select_posthog_code_repository_activity,
+)
 from posthog.temporal.ai.research_agent import ResearchAgentWorkflow, process_research_agent_activity
 from posthog.temporal.ai.session_summary.activities import (
     analyze_video_segment_activity,
@@ -29,24 +47,6 @@ from posthog.temporal.ai.slack_conversation import (
     SlackConversationRunnerWorkflow,
     SlackConversationRunnerWorkflowInputs,
     process_slack_conversation_activity,
-)
-from posthog.temporal.ai.posthog_code_slack_interactivity import (
-    PostHogCodeSlackTerminateTaskWorkflow,
-    process_posthog_code_terminate_task_activity,
-)
-from posthog.temporal.ai.posthog_code_slack_mention import (
-    PostHogCodeSlackMentionWorkflow,
-    collect_posthog_code_thread_messages_activity,
-    create_posthog_code_routing_rule_activity,
-    create_posthog_code_task_for_repo_activity,
-    forward_posthog_code_followup_activity,
-    handle_posthog_code_rules_command_activity,
-    post_posthog_code_internal_error_activity,
-    post_posthog_code_no_repos_activity,
-    post_posthog_code_picker_timeout_activity,
-    post_posthog_code_repo_picker_activity,
-    resolve_posthog_code_slack_user_activity,
-    select_posthog_code_repository_activity,
 )
 
 from products.signals.backend.temporal import (

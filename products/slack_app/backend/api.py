@@ -30,13 +30,19 @@ from posthog.models.integration import (
 from posthog.models.organization import OrganizationMembership
 from posthog.models.user import User
 from posthog.security.outbound_proxy import external_requests
+from posthog.temporal.ai.posthog_code_slack_interactivity import (
+    PostHogCodeSlackInteractivityInputs,
+    PostHogCodeSlackTerminateTaskWorkflow,
+)
+from posthog.temporal.ai.posthog_code_slack_mention import (
+    PostHogCodeSlackMentionWorkflow,
+    PostHogCodeSlackMentionWorkflowInputs,
+)
 from posthog.temporal.ai.slack_conversation import (
     THINKING_MESSAGES,
     SlackConversationRunnerWorkflow,
     SlackConversationRunnerWorkflowInputs,
 )
-from posthog.temporal.ai.posthog_code_slack_interactivity import PostHogCodeSlackInteractivityInputs, PostHogCodeSlackTerminateTaskWorkflow
-from posthog.temporal.ai.posthog_code_slack_mention import PostHogCodeSlackMentionWorkflow, PostHogCodeSlackMentionWorkflowInputs
 from posthog.temporal.common.client import sync_connect
 from posthog.user_permissions import UserPermissions
 from posthog.utils import get_instance_region
