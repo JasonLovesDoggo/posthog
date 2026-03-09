@@ -5,9 +5,6 @@ def rename_twig_to_posthog_code(apps, schema_editor):
     Integration = apps.get_model("posthog", "Integration")
     Integration.objects.filter(kind="slack-twig").update(kind="slack-posthog-code")
 
-    OAuthApplication = apps.get_model("posthog", "OAuthApplication")
-    OAuthApplication.objects.filter(auth_brand="twig").update(auth_brand="posthog-code")
-
 
 class Migration(migrations.Migration):
     dependencies = [
@@ -50,16 +47,6 @@ class Migration(migrations.Migration):
                     ("pinterest-ads", "Pinterest Ads"),
                 ],
                 max_length=20,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="oauthapplication",
-            name="auth_brand",
-            field=models.CharField(
-                choices=[("posthog", "posthog"), ("posthog-code", "posthog-code")],
-                default="posthog",
-                help_text="Branding to use on authentication pages",
-                max_length=32,
             ),
         ),
     ]

@@ -24,7 +24,6 @@ from django.views.decorators.http import require_http_methods
 
 import structlog
 
-from posthog.auth import AUTH_BRAND_COOKIE, apply_auth_brand_cookie, normalize_auth_brand
 from posthog.cloud_utils import is_cloud
 from posthog.email import is_email_available
 from posthog.exceptions_capture import capture_exception
@@ -90,7 +89,7 @@ def login_required(view):
                 del search_params["next"]
                 response["Location"] = urlunparse(parsed_url._replace(query=urlencode(search_params)))
 
-        return apply_auth_brand_cookie(request, response)
+        return response
 
     return handler
 
@@ -208,10 +207,6 @@ def preflight_check(request: HttpRequest) -> JsonResponse:
         "object_storage": is_cloud() or is_object_storage_available(),
         "public_egress_ip_addresses": settings.PUBLIC_EGRESS_IP_ADDRESSES,
     }
-    auth_brand = normalize_auth_brand(request.COOKIES.get(AUTH_BRAND_COOKIE))
-    if auth_brand:
-        response["auth_brand"] = auth_brand
-
     if settings.DEBUG or settings.E2E_TESTING:
         response["is_debug"] = True
 
