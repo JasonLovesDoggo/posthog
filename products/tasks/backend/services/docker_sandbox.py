@@ -93,7 +93,9 @@ class DockerSandbox:
         Configure via LOCAL_POSTHOG_CODE_MONOREPO_ROOT pointing to the PostHog Code monorepo root.
         Returns tuple of (agent_path, shared_path, git_path) or None if not configured.
         """
-        monorepo_root = os.environ.get("LOCAL_POSTHOG_CODE_MONOREPO_ROOT", os.environ.get("LOCAL_TWIG_MONOREPO_ROOT", ""))
+        monorepo_root = os.environ.get(
+            "LOCAL_POSTHOG_CODE_MONOREPO_ROOT", os.environ.get("LOCAL_TWIG_MONOREPO_ROOT", "")
+        )
         if not monorepo_root or not os.path.isdir(monorepo_root):
             return None
 
@@ -556,7 +558,9 @@ class DockerSandbox:
         branch: str | None = None,
         mcp_servers_arg: str = "",
     ) -> str:
-        env_prefix = f"env POSTHOG_CODE_INTERACTION_ORIGIN={shlex.quote(interaction_origin)} " if interaction_origin else ""
+        env_prefix = (
+            f"env POSTHOG_CODE_INTERACTION_ORIGIN={shlex.quote(interaction_origin)} " if interaction_origin else ""
+        )
         branch_flag = f" --baseBranch {shlex.quote(branch)}" if branch else ""
         return (
             f"cd /scripts && "
