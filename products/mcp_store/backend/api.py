@@ -481,7 +481,9 @@ class MCPServerInstallationViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet
         # Generate a PKCE challenge and state token for the OAuth flow.
         code_verifier, code_challenge = generate_pkce()
         token = secrets.token_urlsafe(32)
-        _create_oauth_state(installation, server, token, install_source, posthog_code_callback_url, pkce_verifier=code_verifier)
+        _create_oauth_state(
+            installation, server, token, install_source, posthog_code_callback_url, pkce_verifier=code_verifier
+        )
 
         try:
             authorize_url = self._build_dcr_authorize_url(
@@ -737,7 +739,10 @@ class MCPOAuthRedirectViewSet(viewsets.ViewSet):
         code = request.query_params.get("code")
         if not code:
             return self._build_oauth_redirect(
-                install_source, installation, error="Missing authorization code", posthog_code_callback_url=posthog_code_callback_url
+                install_source,
+                installation,
+                error="Missing authorization code",
+                posthog_code_callback_url=posthog_code_callback_url,
             )
 
         try:
@@ -750,7 +755,9 @@ class MCPOAuthRedirectViewSet(viewsets.ViewSet):
                 posthog_code_callback_url=posthog_code_callback_url,
             )
 
-        return self._build_oauth_redirect(install_source, installation, posthog_code_callback_url=posthog_code_callback_url)
+        return self._build_oauth_redirect(
+            install_source, installation, posthog_code_callback_url=posthog_code_callback_url
+        )
 
     @staticmethod
     def _consume_oauth_state(state_token: str) -> MCPOAuthState | None:

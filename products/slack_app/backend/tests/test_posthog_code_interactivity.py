@@ -198,7 +198,9 @@ class TestRepoPickerOptions(TestCase):
         response = self._post_interactivity(payload)
         assert response.status_code == 200
         mock_sync_connect.assert_called_once()
-        mock_sync_connect.return_value.get_workflow_handle.assert_called_once_with("posthog-code-mention-T12345:C001:1234.5678")
+        mock_sync_connect.return_value.get_workflow_handle.assert_called_once_with(
+            "posthog-code-mention-T12345:C001:1234.5678"
+        )
         mock_asyncio_run.assert_called_once()
         mock_webclient_class.return_value.chat_update.assert_called_once()
 

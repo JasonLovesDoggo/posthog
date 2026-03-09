@@ -168,7 +168,9 @@ class TestForwardPostHogCodeFollowupActivity(TestCase):
 
     def test_no_mapping_returns_false(self):
         inputs = _make_inputs(self.integration.id)
-        result = forward_posthog_code_followup_activity(inputs, "C123", "1234.5678", "U_ALICE", "do something", "1234.5679")
+        result = forward_posthog_code_followup_activity(
+            inputs, "C123", "1234.5678", "U_ALICE", "do something", "1234.5679"
+        )
         assert result is False
 
     @patch("products.tasks.backend.temporal.client.execute_task_processing_workflow")
@@ -219,7 +221,9 @@ class TestForwardPostHogCodeFollowupActivity(TestCase):
         mock_slack_cls.return_value = MagicMock()
 
         inputs = _make_inputs(self.integration.id)
-        forward_posthog_code_followup_activity(inputs, "C123", "1234.5678", "U_ALICE", "<@BOT> fix the tests", "1234.5679")
+        forward_posthog_code_followup_activity(
+            inputs, "C123", "1234.5678", "U_ALICE", "<@BOT> fix the tests", "1234.5679"
+        )
 
         new_run_id = mock_execute_workflow.call_args.kwargs["run_id"]
         new_run = self.TaskRun.objects.get(id=new_run_id)
@@ -293,7 +297,9 @@ class TestForwardPostHogCodeFollowupActivity(TestCase):
         mock_slack_cls.return_value = mock_slack_instance
 
         inputs = _make_inputs(self.integration.id)
-        result = forward_posthog_code_followup_activity(inputs, "C123", "1234.5678", "U_BOB", "do something", "1234.5679")
+        result = forward_posthog_code_followup_activity(
+            inputs, "C123", "1234.5678", "U_BOB", "do something", "1234.5679"
+        )
         assert result is True
         mock_slack_instance.client.chat_postMessage.assert_called_once()
         call_kwargs = mock_slack_instance.client.chat_postMessage.call_args.kwargs
@@ -308,7 +314,9 @@ class TestForwardPostHogCodeFollowupActivity(TestCase):
         mock_slack_cls.return_value = mock_slack_instance
 
         inputs = _make_inputs(self.integration.id)
-        result = forward_posthog_code_followup_activity(inputs, "C123", "1234.5678", "U_ALICE", "do something", "1234.5679")
+        result = forward_posthog_code_followup_activity(
+            inputs, "C123", "1234.5678", "U_ALICE", "do something", "1234.5679"
+        )
         assert result is True
         call_kwargs = mock_slack_instance.client.chat_postMessage.call_args.kwargs
         assert "still starting up" in call_kwargs["text"]

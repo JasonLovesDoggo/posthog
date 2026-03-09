@@ -123,7 +123,9 @@ class PostHogCodeSlackMentionWorkflow(PostHogWorkflow):
                         timeout=timedelta(minutes=POSTHOG_CODE_SLACK_PICKER_TIMEOUT_MINUTES),
                     )
                 except TimeoutError:
-                    await _execute_posthog_code_activity(post_posthog_code_picker_timeout_activity, inputs, channel, thread_ts)
+                    await _execute_posthog_code_activity(
+                        post_posthog_code_picker_timeout_activity, inputs, channel, thread_ts
+                    )
                     return
 
                 if not self._selected_repo:
@@ -160,7 +162,9 @@ class PostHogCodeSlackMentionWorkflow(PostHogWorkflow):
 
             if decision.mode == "picker":
                 if decision.reason == "no_repos":
-                    await _execute_posthog_code_activity(post_posthog_code_no_repos_activity, inputs, channel, thread_ts)
+                    await _execute_posthog_code_activity(
+                        post_posthog_code_no_repos_activity, inputs, channel, thread_ts
+                    )
                     return
 
                 await _execute_posthog_code_activity(
@@ -179,7 +183,9 @@ class PostHogCodeSlackMentionWorkflow(PostHogWorkflow):
                         timeout=timedelta(minutes=POSTHOG_CODE_SLACK_PICKER_TIMEOUT_MINUTES),
                     )
                 except TimeoutError:
-                    await _execute_posthog_code_activity(post_posthog_code_picker_timeout_activity, inputs, channel, thread_ts)
+                    await _execute_posthog_code_activity(
+                        post_posthog_code_picker_timeout_activity, inputs, channel, thread_ts
+                    )
                     return
 
                 if not self._selected_repo:
@@ -573,7 +579,9 @@ def select_posthog_code_repository_activity(
 
 
 @activity.defn
-def post_posthog_code_no_repos_activity(inputs: PostHogCodeSlackMentionWorkflowInputs, channel: str, thread_ts: str) -> None:
+def post_posthog_code_no_repos_activity(
+    inputs: PostHogCodeSlackMentionWorkflowInputs, channel: str, thread_ts: str
+) -> None:
     from posthog.models.integration import Integration, SlackIntegration
 
     integration = Integration.objects.select_related("team", "team__organization").get(
@@ -1263,7 +1271,9 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
 
 
 @activity.defn
-def post_posthog_code_picker_timeout_activity(inputs: PostHogCodeSlackMentionWorkflowInputs, channel: str, thread_ts: str) -> None:
+def post_posthog_code_picker_timeout_activity(
+    inputs: PostHogCodeSlackMentionWorkflowInputs, channel: str, thread_ts: str
+) -> None:
     from posthog.models.integration import Integration, SlackIntegration
 
     integration = Integration.objects.select_related("team", "team__organization").get(
@@ -1280,7 +1290,9 @@ def post_posthog_code_picker_timeout_activity(inputs: PostHogCodeSlackMentionWor
 
 
 @activity.defn
-def post_posthog_code_internal_error_activity(inputs: PostHogCodeSlackMentionWorkflowInputs, channel: str, thread_ts: str) -> None:
+def post_posthog_code_internal_error_activity(
+    inputs: PostHogCodeSlackMentionWorkflowInputs, channel: str, thread_ts: str
+) -> None:
     from posthog.models.integration import Integration, SlackIntegration
 
     integration = Integration.objects.select_related("team", "team__organization").get(

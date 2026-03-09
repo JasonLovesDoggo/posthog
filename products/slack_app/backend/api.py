@@ -1249,7 +1249,9 @@ def _handle_repo_picker_options(payload: dict) -> JsonResponse:
         if not integration_id:
             raise Integration.DoesNotExist
         # nosemgrep: idor-lookup-without-team — Slack webhook: no team context; scoped by PK + kind + Slack team ID
-        integration = Integration.objects.get(id=integration_id, kind="slack-posthog-code", integration_id=slack_team_id)
+        integration = Integration.objects.get(
+            id=integration_id, kind="slack-posthog-code", integration_id=slack_team_id
+        )
     except Integration.DoesNotExist:
         logger.info("posthog_code_repo_picker_options_no_integration", context_token=context_token)
         return JsonResponse({"options": []})
@@ -1261,7 +1263,9 @@ def _handle_repo_picker_options(payload: dict) -> JsonResponse:
         return JsonResponse({"options": []})
 
     if not all_repos:
-        logger.info("posthog_code_repo_picker_options_no_repos", context_token=context_token, integration_id=integration.id)
+        logger.info(
+            "posthog_code_repo_picker_options_no_repos", context_token=context_token, integration_id=integration.id
+        )
         return JsonResponse({"options": []})
 
     query = (payload.get("value") or "").lower()
@@ -1303,7 +1307,9 @@ def _handle_repo_picker_submit(payload: dict) -> HttpResponse:
 
         try:
             # nosemgrep: idor-lookup-without-team — Slack webhook: no team context; scoped by PK + kind + Slack team ID
-            integration = Integration.objects.get(id=integration_id, kind="slack-posthog-code", integration_id=slack_team_id)
+            integration = Integration.objects.get(
+                id=integration_id, kind="slack-posthog-code", integration_id=slack_team_id
+            )
             SlackIntegration(integration).client.chat_postMessage(
                 channel=channel,
                 thread_ts=thread_ts,
@@ -1355,7 +1361,9 @@ def _replace_repo_picker_with_selection(payload: dict, context: dict | None, sel
 
     try:
         # nosemgrep: idor-lookup-without-team — Slack webhook: no team context; scoped by PK + kind + Slack team ID
-        integration = Integration.objects.get(id=integration_id, kind="slack-posthog-code", integration_id=slack_team_id)
+        integration = Integration.objects.get(
+            id=integration_id, kind="slack-posthog-code", integration_id=slack_team_id
+        )
         slack = SlackIntegration(integration)
         text = f"Repository selected: `{selected_repo}`"
         slack.client.chat_update(
@@ -1384,7 +1392,9 @@ def _handle_terminate_task_submit(payload: dict) -> HttpResponse:
     action_ts = action.get("action_ts") if action else ""
     team_id = payload.get("team", {}).get("id", "")
     user_id = payload.get("user", {}).get("id", "")
-    workflow_id = f"posthog-code-terminate-task:{team_id}:{user_id}:{action_ts or payload.get('message', {}).get('ts', '')}"
+    workflow_id = (
+        f"posthog-code-terminate-task:{team_id}:{user_id}:{action_ts or payload.get('message', {}).get('ts', '')}"
+    )
     try:
         client = sync_connect()
         asyncio.run(
