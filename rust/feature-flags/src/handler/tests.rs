@@ -169,6 +169,9 @@ async fn test_evaluate_feature_flags() {
         evaluation_runtime: Some("all".to_string()),
         evaluation_tags: None,
         bucketing_identifier: None,
+        direct_dependency_flag_ids: None,
+        dependency_flag_ids: None,
+        has_missing_dependencies: None,
     };
 
     let feature_flag_list = FeatureFlagList {
@@ -270,6 +273,9 @@ async fn test_evaluate_feature_flags_with_errors() {
         evaluation_runtime: Some("all".to_string()),
         evaluation_tags: None,
         bucketing_identifier: None,
+        direct_dependency_flag_ids: None,
+        dependency_flag_ids: None,
+        has_missing_dependencies: None,
     }];
 
     let feature_flag_list = FeatureFlagList {
@@ -658,6 +664,9 @@ async fn test_evaluate_feature_flags_multiple_flags() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Flag 2".to_string()),
@@ -683,6 +692,9 @@ async fn test_evaluate_feature_flags_multiple_flags() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
     ];
 
@@ -770,6 +782,9 @@ async fn test_evaluate_feature_flags_details() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Flag 2".to_string()),
@@ -795,6 +810,9 @@ async fn test_evaluate_feature_flags_details() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
     ];
 
@@ -952,6 +970,9 @@ async fn test_evaluate_feature_flags_with_overrides() {
         evaluation_runtime: Some("all".to_string()),
         evaluation_tags: None,
         bucketing_identifier: None,
+        direct_dependency_flag_ids: None,
+        dependency_flag_ids: None,
+        has_missing_dependencies: None,
     };
     let feature_flag_list = FeatureFlagList {
         flags: vec![flag],
@@ -1059,6 +1080,9 @@ async fn test_long_distinct_id() {
         evaluation_runtime: Some("all".to_string()),
         evaluation_tags: None,
         bucketing_identifier: None,
+        direct_dependency_flag_ids: None,
+        dependency_flag_ids: None,
+        has_missing_dependencies: None,
     };
 
     let feature_flag_list = FeatureFlagList {
@@ -1240,6 +1264,9 @@ async fn test_fetch_and_filter_flags() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Survey Flag 2".to_string()),
@@ -1254,6 +1281,9 @@ async fn test_fetch_and_filter_flags() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Regular Flag 1".to_string()),
@@ -1268,6 +1298,9 @@ async fn test_fetch_and_filter_flags() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Regular Flag 2".to_string()),
@@ -1282,6 +1315,9 @@ async fn test_fetch_and_filter_flags() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
     ];
 
@@ -1517,6 +1553,9 @@ async fn test_parallel_path_matches_sequential_results() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Always Off".to_string()),
@@ -1542,6 +1581,9 @@ async fn test_parallel_path_matches_sequential_results() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Deleted Flag".to_string()),
@@ -1567,6 +1609,9 @@ async fn test_parallel_path_matches_sequential_results() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
         FeatureFlag {
             name: Some("Inactive Flag".to_string()),
@@ -1592,6 +1637,9 @@ async fn test_parallel_path_matches_sequential_results() {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         },
     ];
 

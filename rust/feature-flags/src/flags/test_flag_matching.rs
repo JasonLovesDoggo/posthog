@@ -24,7 +24,7 @@ mod tests {
         },
         properties::property_models::{OperatorType, PropertyFilter, PropertyType},
         utils::{
-            graph_utils::build_dependency_graph,
+            graph_utils::PrecomputedDependencyGraph,
             test_utils::{create_test_flag, TestContext},
         },
     };
@@ -1325,6 +1325,9 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         }
     }
 
@@ -4266,6 +4269,9 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         };
 
         // Test user "11" - should get first-variant
@@ -4932,6 +4938,9 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: Some("device_id".to_string()),
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         }
     }
 
@@ -5769,6 +5778,9 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         };
 
         let router = context.create_postgres_router();
@@ -5888,8 +5900,8 @@ mod tests {
         };
 
         // Build dependency graph for the flags
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         // Test the scenario where hash key override reading fails
         // This simulates the case where we have experience continuity flags but hash override reads fail
@@ -5905,8 +5917,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 overrides,
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();
@@ -5994,8 +6006,8 @@ mod tests {
             filtered_out_flag_ids: filtered_out.clone(),
         };
 
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         // Simulate a hash-key-override read failure
         let overrides = crate::flags::flag_matching::FlagEvaluationOverrides {
@@ -6012,8 +6024,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 overrides,
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();
@@ -6086,8 +6098,8 @@ mod tests {
         };
 
         // Build dependency graph for the flags
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         let router = context.create_postgres_router();
         let mut matcher = FeatureFlagMatcher::new(
@@ -6107,8 +6119,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 Default::default(),
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();
@@ -6187,8 +6199,8 @@ mod tests {
             filtered_out_flag_ids: filtered_out.clone(),
         };
 
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         let router = context.create_postgres_router();
         let mut matcher = FeatureFlagMatcher::new(
@@ -6206,8 +6218,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 Default::default(),
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();
@@ -6283,8 +6295,8 @@ mod tests {
             filtered_out_flag_ids: filtered_out.clone(),
         };
 
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         let router = context.create_postgres_router();
         let mut matcher = FeatureFlagMatcher::new(
@@ -6302,8 +6314,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 Default::default(),
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();
@@ -6384,8 +6396,8 @@ mod tests {
             ..Default::default()
         };
 
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         let router = context.create_postgres_router();
         let mut matcher = FeatureFlagMatcher::new(
@@ -6405,8 +6417,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 Default::default(),
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();
@@ -6477,8 +6489,8 @@ mod tests {
             filtered_out_flag_ids: filtered_out.clone(),
         };
 
-        let graph_result =
-            build_dependency_graph(&flags, team.id).expect("Should build dependency graph");
+        let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
+            .expect("Should build dependency graph");
 
         let router = context.create_postgres_router();
         let mut matcher = FeatureFlagMatcher::new(
@@ -6496,8 +6508,8 @@ mod tests {
             .evaluate_flags_with_overrides(
                 Default::default(),
                 Uuid::new_v4(),
-                graph_result.graph,
-                graph_result.flags_with_missing_deps,
+                precomputed.evaluation_stages,
+                precomputed.flags_with_missing_deps,
             )
             .await
             .unwrap();

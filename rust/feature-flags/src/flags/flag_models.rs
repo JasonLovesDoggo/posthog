@@ -112,6 +112,18 @@ pub struct FeatureFlag {
     pub evaluation_tags: Option<Vec<String>>,
     #[serde(default)]
     pub bucketing_identifier: Option<String>,
+    /// Pre-computed sorted list of direct dependency flag IDs.
+    /// Computed by Django at cache-write time. `None` means old cache format.
+    #[serde(default)]
+    pub direct_dependency_flag_ids: Option<Vec<i32>>,
+    /// Pre-computed sorted list of all transitive dependency flag IDs.
+    /// Computed by Django at cache-write time. `None` means old cache format.
+    #[serde(default)]
+    pub dependency_flag_ids: Option<Vec<i32>>,
+    /// Pre-computed flag indicating missing, cyclic, or transitively broken deps.
+    /// Computed by Django at cache-write time. `None` means old cache format.
+    #[serde(default)]
+    pub has_missing_dependencies: Option<bool>,
 }
 
 impl FeatureFlag {

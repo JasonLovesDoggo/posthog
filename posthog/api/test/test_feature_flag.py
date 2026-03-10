@@ -23,7 +23,7 @@ from rest_framework import status
 
 from posthog import redis
 from posthog.api.cohort import get_cohort_actors_for_feature_flag
-from posthog.api.feature_flag import FeatureFlagSerializer, extract_etag_from_header
+from posthog.api.feature_flag import MAX_PROPERTY_VALUES, FeatureFlagSerializer, extract_etag_from_header
 from posthog.models import Experiment, FeatureFlag, GroupTypeMapping, Tag, TaggedItem, User
 from posthog.models.cohort import Cohort
 from posthog.models.dashboard import Dashboard
@@ -85,6 +85,7 @@ class TestFeatureFlag(APIBaseTest, ClickhouseTestMixin):
         return super().setUp()
 
     def test_cant_create_flag_with_more_than_max_values(self):
+        values = [f"{i}@gmail.com" for i in range(MAX_PROPERTY_VALUES + 1)]
         response = self.client.post(
             f"/api/projects/{self.team.id}/feature_flags",
             {
@@ -98,20 +99,7 @@ class TestFeatureFlag(APIBaseTest, ClickhouseTestMixin):
                                 {
                                     "key": "email",
                                     "type": "person",
-                                    "value": [
-                                        "1@gmail.com",
-                                        "2@gmail.com",
-                                        "3@gmail.com",
-                                        "4@gmail.com",
-                                        "5@gmail.com",
-                                        "6@gmail.com",
-                                        "7@gmail.com",
-                                        "8@gmail.com",
-                                        "9@gmail.com",
-                                        "10@gmail.com",
-                                        "11@gmail.com",
-                                        "12@gmail.com",
-                                    ],
+                                    "value": values,
                                     "operator": "exact",
                                 }
                             ],
@@ -120,16 +108,13 @@ class TestFeatureFlag(APIBaseTest, ClickhouseTestMixin):
                 },
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.json(),
-            {
-                "type": "validation_error",
-                "code": "invalid_input",
-                "detail": "Property group expressions of type email cannot contain more than 10 values.",
-                "attr": "filters",
-            },
-        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == {
+            "type": "validation_error",
+            "code": "invalid_input",
+            "detail": f"Property 'email' cannot have more than {MAX_PROPERTY_VALUES} values.",
+            "attr": "filters",
+        }
 
     def test_cant_create_flag_with_duplicate_key(self):
         FeatureFlag.objects.create(team=self.team, created_by=self.user, key="red_button")

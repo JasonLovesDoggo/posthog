@@ -834,13 +834,9 @@ class FeatureFlagSerializer(
                     )
 
                 if isinstance(prop.value, list):
-                    upper_limit = MAX_PROPERTY_VALUES
-                    if settings.TEST:
-                        upper_limit = 10
-
-                    if len(prop.value) > upper_limit:
+                    if len(prop.value) > MAX_PROPERTY_VALUES:
                         raise serializers.ValidationError(
-                            f"Property group expressions of type {prop.key} cannot contain more than {upper_limit} values."
+                            f"Property '{prop.key}' cannot have more than {MAX_PROPERTY_VALUES} values."
                         )
 
                 if prop.type == "cohort":

@@ -335,6 +335,9 @@ mod tests {
                     evaluation_runtime: Some("all".to_string()),
                     evaluation_tags: None,
                     bucketing_identifier: None,
+                    direct_dependency_flag_ids: None,
+                    dependency_flag_ids: None,
+                    has_missing_dependencies: None,
                 },
                 FeatureFlag {
                     id: 2,
@@ -356,6 +359,9 @@ mod tests {
                     evaluation_runtime: Some("all".to_string()),
                     evaluation_tags: None,
                     bucketing_identifier: None,
+                    direct_dependency_flag_ids: None,
+                    dependency_flag_ids: None,
+                    has_missing_dependencies: None,
                 },
                 FeatureFlag {
                     id: 3,
@@ -388,6 +394,9 @@ mod tests {
                     evaluation_runtime: Some("all".to_string()),
                     evaluation_tags: None,
                     bucketing_identifier: None,
+                    direct_dependency_flag_ids: None,
+                    dependency_flag_ids: None,
+                    has_missing_dependencies: None,
                 },
             ],
             ..Default::default()
@@ -509,6 +518,9 @@ mod tests {
                     evaluation_runtime: Some("all".to_string()),
                     evaluation_tags: None,
                     bucketing_identifier: None,
+                    direct_dependency_flag_ids: None,
+                    dependency_flag_ids: None,
+                    has_missing_dependencies: None,
                 })
                 .collect(),
             ..Default::default()

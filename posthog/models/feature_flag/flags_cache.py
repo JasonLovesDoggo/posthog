@@ -68,6 +68,119 @@ logger = structlog.get_logger(__name__)
 # Sorted set key for tracking cache expirations
 FLAGS_CACHE_EXPIRY_SORTED_SET = "flags_cache_expiry"
 
+# DFS states for cycle detection
+_UNVISITED, _IN_PROGRESS, _DONE = 0, 1, 2
+
+
+def _extract_direct_dependency_ids(flag_data: dict[str, Any]) -> set[int]:
+    """
+    Extract direct flag dependency IDs from a serialized flag's filters.
+
+    Scans filters.groups[*].properties for type=="flag" properties and parses
+    their key as an integer flag ID. Inactive/deleted flags return empty deps
+    to match Rust's extract_dependencies behavior.
+    """
+    if not flag_data.get("active", True) or flag_data.get("deleted", False):
+        return set()
+
+    dep_ids: set[int] = set()
+    filters = flag_data.get("filters", {})
+    for group in filters.get("groups", []):
+        for prop in group.get("properties", []):
+            if prop.get("type") == "flag":
+                try:
+                    dep_ids.add(int(prop["key"]))
+                except (ValueError, KeyError, TypeError):
+                    continue
+    return dep_ids
+
+
+def _compute_flag_dependencies(flags_data: list[dict[str, Any]]) -> None:
+    """
+    Compute per-flag dependency data and attach it to each flag dict.
+
+    Adds three fields to each flag:
+    - direct_dependency_flag_ids: sorted list of direct dependency flag IDs
+    - dependency_flag_ids: sorted list of all transitive dependency flag IDs
+    - has_missing_dependencies: True if any dependency is missing, cyclic, or
+      transitively broken
+
+    Uses iterative DFS with cycle detection to compute transitive closures.
+    Modifies the flag dicts in place.
+    """
+    id_to_flag: dict[int, dict[str, Any]] = {}
+    for flag in flags_data:
+        flag_id = flag.get("id")
+        if flag_id is not None:
+            id_to_flag[flag_id] = flag
+
+    direct_deps: dict[int, set[int]] = {}
+    for flag_id in id_to_flag:
+        direct_deps[flag_id] = _extract_direct_dependency_ids(id_to_flag[flag_id])
+
+    state: dict[int, int] = dict.fromkeys(id_to_flag, _UNVISITED)
+    transitive_deps: dict[int, set[int]] = {}
+    has_missing: dict[int, bool] = {}
+    cycled_flags: set[int] = set()
+
+    # Iterative DFS with explicit stack to avoid hitting Python's recursion limit
+    # for deep dependency chains (MAX_FEATURE_FLAGS_PER_TEAM can exceed the default
+    # recursion limit of 1000).
+    for start_id in id_to_flag:
+        if state[start_id] != _UNVISITED:
+            continue
+
+        stack: list[tuple[int, bool]] = [(start_id, False)]
+        while stack:
+            flag_id, returning = stack.pop()
+
+            if returning:
+                # Post-order: aggregate results from children
+                all_deps: set[int] = set()
+                flag_has_missing = False
+                for dep_id in direct_deps.get(flag_id, set()):
+                    if dep_id not in id_to_flag:
+                        flag_has_missing = True
+                        continue
+                    all_deps.add(dep_id)
+                    if dep_id in cycled_flags:
+                        flag_has_missing = True
+                    else:
+                        all_deps.update(transitive_deps.get(dep_id, set()))
+                        if has_missing.get(dep_id, False):
+                            flag_has_missing = True
+                if flag_id in cycled_flags:
+                    flag_has_missing = True
+                state[flag_id] = _DONE
+                transitive_deps[flag_id] = all_deps
+                has_missing[flag_id] = flag_has_missing
+                continue
+
+            if state[flag_id] == _DONE:
+                continue
+            if state[flag_id] == _IN_PROGRESS:
+                cycled_flags.add(flag_id)
+                continue
+
+            state[flag_id] = _IN_PROGRESS
+            stack.append((flag_id, True))
+            for dep_id in direct_deps.get(flag_id, set()):
+                if dep_id in id_to_flag and state[dep_id] == _UNVISITED:
+                    stack.append((dep_id, False))
+                elif dep_id in id_to_flag and state[dep_id] == _IN_PROGRESS:
+                    cycled_flags.add(dep_id)
+
+    for flag in flags_data:
+        flag_id = flag.get("id")
+        if flag_id is not None and flag_id in transitive_deps:
+            flag["direct_dependency_flag_ids"] = sorted(direct_deps.get(flag_id, set()))
+            flag["dependency_flag_ids"] = sorted(transitive_deps[flag_id])
+            flag["has_missing_dependencies"] = has_missing.get(flag_id, False)
+        else:
+            flag["direct_dependency_flag_ids"] = []
+            flag["dependency_flag_ids"] = []
+            flag["has_missing_dependencies"] = False
+
 
 def _get_feature_flags_for_service(team: Team) -> dict[str, Any]:
     """
@@ -87,6 +200,7 @@ def _get_feature_flags_for_service(team: Team) -> dict[str, Any]:
     # Exclude encrypted remote config flags at DB level for efficiency
     flags = get_feature_flags(team=team, exclude_encrypted_remote_config=True)
     flags_data = serialize_feature_flags(flags)
+    _compute_flag_dependencies(flags_data)
 
     logger.info(
         "Loaded feature flags for service cache",
@@ -154,6 +268,7 @@ def _get_feature_flags_for_teams_batch(teams: list[Team]) -> dict[int, dict[str,
     for team in teams:
         team_flags = flags_by_team_id.get(team.id, [])
         flags_data = serialize_feature_flags(team_flags)
+        _compute_flag_dependencies(flags_data)
 
         logger.info(
             "Loaded feature flags for service cache (batch)",

@@ -146,6 +146,9 @@ impl FeatureFlagList {
                         evaluation_runtime: row.evaluation_runtime,
                         evaluation_tags: row.evaluation_tags,
                         bucketing_identifier: row.bucketing_identifier,
+                        direct_dependency_flag_ids: None,
+                        dependency_flag_ids: None,
+                        has_missing_dependencies: None,
                     }),
                     Err(e) => {
                         // This is highly unlikely to happen, but if it does, we skip the flag.
@@ -597,6 +600,9 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
+            direct_dependency_flag_ids: None,
+            dependency_flag_ids: None,
+            has_missing_dependencies: None,
         }];
 
         // Serialize as we do in production cache
