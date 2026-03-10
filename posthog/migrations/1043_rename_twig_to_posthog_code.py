@@ -8,7 +8,7 @@ def rename_twig_to_posthog_code(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("posthog", "1039_subscription_dashboard_export_insights"),
+        ("posthog", "1042_subscription_integration_idx"),
     ]
 
     operations = [
