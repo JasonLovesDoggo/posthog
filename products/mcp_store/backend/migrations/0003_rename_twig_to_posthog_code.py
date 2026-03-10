@@ -13,10 +13,20 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(rename_twig_to_posthog_code, migrations.RunPython.noop, elidable=True),
-        migrations.RenameField(
-            model_name="mcpoauthstate",
-            old_name="twig_callback_url",
-            new_name="posthog_code_callback_url",
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.RenameField(
+                    model_name="mcpoauthstate",
+                    old_name="twig_callback_url",
+                    new_name="posthog_code_callback_url",
+                ),
+                migrations.AlterField(
+                    model_name="mcpoauthstate",
+                    name="posthog_code_callback_url",
+                    field=models.TextField(blank=True, default="", db_column="twig_callback_url"),
+                ),
+            ],
+            database_operations=[],
         ),
         migrations.AlterField(
             model_name="mcpoauthstate",

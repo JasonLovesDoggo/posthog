@@ -57,6 +57,7 @@ class OAuthApplicationAdmin(admin.ModelAdmin):
         "id",
         "name",
         "client_id",
+        "auth_brand",
         "is_verified",
         "is_dcr_client",
         "is_first_party",
@@ -65,7 +66,7 @@ class OAuthApplicationAdmin(admin.ModelAdmin):
         "authorization_grant_type",
     )
     list_display_links = ("id", "name")
-    list_filter = ("authorization_grant_type", "is_verified", "is_dcr_client", "is_first_party")
+    list_filter = ("authorization_grant_type", "is_verified", "is_dcr_client", "is_first_party", "auth_brand")
     search_fields = ("name", "client_id", "user__email", "organization__name")
     autocomplete_fields = ("user", "organization")
     ordering = ("name",)
@@ -97,7 +98,7 @@ class OAuthApplicationAdmin(admin.ModelAdmin):
     def get_fieldsets(self, request, obj=None):
         if obj:
             return (
-                (None, {"fields": ("id", "name", "client_id", "client_type")}),
+                (None, {"fields": ("id", "name", "client_id", "client_type", "auth_brand")}),
                 (
                     "Authorization",
                     {"fields": ("authorization_grant_type", "redirect_uris", "algorithm")},
@@ -107,7 +108,7 @@ class OAuthApplicationAdmin(admin.ModelAdmin):
             )
         else:
             return (
-                (None, {"fields": ("name", "client_id", "client_secret", "client_type")}),
+                (None, {"fields": ("name", "client_id", "client_secret", "client_type", "auth_brand")}),
                 (
                     "Authorization",
                     {"fields": ("authorization_grant_type", "redirect_uris", "algorithm")},
