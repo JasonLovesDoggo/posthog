@@ -1325,9 +1325,6 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
-            direct_dependency_flag_ids: None,
-            dependency_flag_ids: None,
-            has_missing_dependencies: None,
         }
     }
 
@@ -4269,9 +4266,6 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
-            direct_dependency_flag_ids: None,
-            dependency_flag_ids: None,
-            has_missing_dependencies: None,
         };
 
         // Test user "11" - should get first-variant
@@ -4938,9 +4932,6 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: Some("device_id".to_string()),
-            direct_dependency_flag_ids: None,
-            dependency_flag_ids: None,
-            has_missing_dependencies: None,
         }
     }
 
@@ -5778,9 +5769,6 @@ mod tests {
             evaluation_runtime: Some("all".to_string()),
             evaluation_tags: None,
             bucketing_identifier: None,
-            direct_dependency_flag_ids: None,
-            dependency_flag_ids: None,
-            has_missing_dependencies: None,
         };
 
         let router = context.create_postgres_router();
@@ -6004,6 +5992,7 @@ mod tests {
         let flags = FeatureFlagList {
             flags: vec![filtered_continuity_flag, active_normal_flag],
             filtered_out_flag_ids: filtered_out.clone(),
+            evaluation_context: None,
         };
 
         let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
@@ -6197,6 +6186,7 @@ mod tests {
         let flags = FeatureFlagList {
             flags: vec![flag_a, flag_b],
             filtered_out_flag_ids: filtered_out.clone(),
+            evaluation_context: None,
         };
 
         let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
@@ -6293,6 +6283,7 @@ mod tests {
         let flags = FeatureFlagList {
             flags: vec![flag_a, flag_b],
             filtered_out_flag_ids: filtered_out.clone(),
+            evaluation_context: None,
         };
 
         let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)
@@ -6487,6 +6478,7 @@ mod tests {
         let flags = FeatureFlagList {
             flags: vec![flag_a, flag_b, flag_c],
             filtered_out_flag_ids: filtered_out.clone(),
+            evaluation_context: None,
         };
 
         let precomputed = PrecomputedDependencyGraph::build(&flags, team.id)

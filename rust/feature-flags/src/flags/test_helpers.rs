@@ -74,9 +74,6 @@ pub fn create_simple_flag(properties: Vec<PropertyFilter>, rollout_percentage: f
         evaluation_runtime: Some("all".to_string()),
         evaluation_tags: None,
         bucketing_identifier: None,
-        direct_dependency_flag_ids: None,
-        dependency_flag_ids: None,
-        has_missing_dependencies: None,
     }
 }
 
@@ -154,6 +151,7 @@ pub async fn update_flags_in_hypercache(
 ) -> Result<(), FlagError> {
     let wrapper = HypercacheFlagsWrapper {
         flags: flags.flags.clone(),
+        evaluation_context: None,
     };
 
     // Match Django's format: JSON string -> Pickle

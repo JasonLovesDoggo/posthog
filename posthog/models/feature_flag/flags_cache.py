@@ -95,18 +95,19 @@ def _extract_direct_dependency_ids(flag_data: dict[str, Any]) -> set[int]:
     return dep_ids
 
 
-def _compute_flag_dependencies(flags_data: list[dict[str, Any]]) -> None:
+def _compute_flag_dependencies(flags_data: list[dict[str, Any]]) -> dict[str, Any]:
     """
-    Compute per-flag dependency data and attach it to each flag dict.
+    Compute flag dependency metadata and return an evaluation context.
 
-    Adds three fields to each flag:
-    - direct_dependency_flag_ids: sorted list of direct dependency flag IDs
-    - dependency_flag_ids: sorted list of all transitive dependency flag IDs
-    - has_missing_dependencies: True if any dependency is missing, cyclic, or
-      transitively broken
+    Returns a dict with:
+    - dependency_stages: list of lists of flag IDs grouped by evaluation stage,
+      stage 0 (no deps) first. Flags in the same stage can be evaluated in parallel.
+    - flags_with_missing_deps: sorted list of flag IDs with missing, cyclic, or
+      transitively broken dependencies.
+    - transitive_deps: dict mapping stringified flag ID to sorted list of all
+      transitive dependency flag IDs.
 
     Uses iterative DFS with cycle detection to compute transitive closures.
-    Modifies the flag dicts in place.
     """
     id_to_flag: dict[int, dict[str, Any]] = {}
     for flag in flags_data:
@@ -122,6 +123,7 @@ def _compute_flag_dependencies(flags_data: list[dict[str, Any]]) -> None:
     transitive_deps: dict[int, set[int]] = {}
     has_missing: dict[int, bool] = {}
     cycled_flags: set[int] = set()
+    stage: dict[int, int] = {}
 
     # Iterative DFS with explicit stack to avoid hitting Python's recursion limit
     # for deep dependency chains (MAX_FEATURE_FLAGS_PER_TEAM can exceed the default
@@ -154,6 +156,13 @@ def _compute_flag_dependencies(flags_data: list[dict[str, Any]]) -> None:
                 state[flag_id] = _DONE
                 transitive_deps[flag_id] = all_deps
                 has_missing[flag_id] = flag_has_missing
+
+                if flag_id not in cycled_flags:
+                    max_dep_stage = -1
+                    for dep_id in direct_deps.get(flag_id, set()):
+                        if dep_id in id_to_flag and dep_id not in cycled_flags:
+                            max_dep_stage = max(max_dep_stage, stage.get(dep_id, 0))
+                    stage[flag_id] = max_dep_stage + 1
                 continue
 
             if state[flag_id] == _DONE:
@@ -170,16 +179,15 @@ def _compute_flag_dependencies(flags_data: list[dict[str, Any]]) -> None:
                 elif dep_id in id_to_flag and state[dep_id] == _IN_PROGRESS:
                     cycled_flags.add(dep_id)
 
-    for flag in flags_data:
-        flag_id = flag.get("id")
-        if flag_id is not None and flag_id in transitive_deps:
-            flag["direct_dependency_flag_ids"] = sorted(direct_deps.get(flag_id, set()))
-            flag["dependency_flag_ids"] = sorted(transitive_deps[flag_id])
-            flag["has_missing_dependencies"] = has_missing.get(flag_id, False)
-        else:
-            flag["direct_dependency_flag_ids"] = []
-            flag["dependency_flag_ids"] = []
-            flag["has_missing_dependencies"] = False
+    # Group flag IDs by stage
+    max_stage = max(stage.values()) if stage else -1
+    dependency_stages = [sorted(fid for fid, s in stage.items() if s == level) for level in range(max_stage + 1)]
+
+    return {
+        "dependency_stages": dependency_stages,
+        "flags_with_missing_deps": sorted(fid for fid, m in has_missing.items() if m),
+        "transitive_deps": {str(fid): sorted(transitive_deps.get(fid, set())) for fid in id_to_flag},
+    }
 
 
 def _get_feature_flags_for_service(team: Team) -> dict[str, Any]:
@@ -200,7 +208,7 @@ def _get_feature_flags_for_service(team: Team) -> dict[str, Any]:
     # Exclude encrypted remote config flags at DB level for efficiency
     flags = get_feature_flags(team=team, exclude_encrypted_remote_config=True)
     flags_data = serialize_feature_flags(flags)
-    _compute_flag_dependencies(flags_data)
+    evaluation_context = _compute_flag_dependencies(flags_data)
 
     logger.info(
         "Loaded feature flags for service cache",
@@ -210,7 +218,7 @@ def _get_feature_flags_for_service(team: Team) -> dict[str, Any]:
     )
 
     # Wrap in dict for HyperCache compatibility
-    return {"flags": flags_data}
+    return {"flags": flags_data, "evaluation_context": evaluation_context}
 
 
 def _get_feature_flags_for_teams_batch(teams: list[Team]) -> dict[int, dict[str, Any]]:
@@ -268,7 +276,7 @@ def _get_feature_flags_for_teams_batch(teams: list[Team]) -> dict[int, dict[str,
     for team in teams:
         team_flags = flags_by_team_id.get(team.id, [])
         flags_data = serialize_feature_flags(team_flags)
-        _compute_flag_dependencies(flags_data)
+        evaluation_context = _compute_flag_dependencies(flags_data)
 
         logger.info(
             "Loaded feature flags for service cache (batch)",
@@ -277,7 +285,7 @@ def _get_feature_flags_for_teams_batch(teams: list[Team]) -> dict[int, dict[str,
             flag_count=len(flags_data),
         )
 
-        result[team.id] = {"flags": flags_data}
+        result[team.id] = {"flags": flags_data, "evaluation_context": evaluation_context}
 
     return result
 

@@ -19,8 +19,8 @@ The Rust feature flags service evaluates flags using a deterministic, hash-based
    ┌──────────┐  ┌───────────┐   ┌────────────┐
    │ SHA1     │  │ Property  │   │ Dependency │
    │ hashing  │  │ matching  │   │ graph      │
-   │ (rollout │  │ (23       │   │ (petgraph  │
-   │  + vars) │  │ operators)│   │  DAG)      │
+   │ (rollout │  │ (23       │   │ (pre-built │
+   │  + vars) │  │ operators)│   │  or DAG)   │
    └──────────┘  └───────────┘   └────────────┘
 ```
 
@@ -42,6 +42,18 @@ pub struct FeatureFlag {
     pub evaluation_runtime: Option<String>,         // "server", "client", or "all"
     pub evaluation_tags: Option<Vec<String>>,
     pub bucketing_identifier: Option<String>,        // "distinct_id" or "device_id"
+}
+```
+
+### EvaluationContext
+
+Pre-computed dependency metadata, built by Django at cache-write time and shipped as a top-level field alongside the flags array in the HyperCache.
+
+```rust
+pub struct EvaluationContext {
+    pub dependency_stages: Vec<Vec<i32>>,           // flag IDs grouped by stage (stage 0 first)
+    pub flags_with_missing_deps: Vec<i32>,          // flag IDs with broken dependencies
+    pub transitive_deps: HashMap<String, Vec<i32>>, // flag ID (string) → transitive dep IDs
 }
 ```
 
@@ -271,13 +283,46 @@ Flags can depend on other flags via `PropertyFilter` with `prop_type: Flag` and 
 
 ### Dependency graph
 
-The service builds a directed acyclic graph (DAG) using `petgraph` to determine evaluation order:
+The dependency graph determines evaluation order so that flags are evaluated after their dependencies.
+
+#### Pre-computed path (HyperCache)
+
+Django pre-computes all dependency metadata at cache-write time and ships it as a top-level `evaluation_context` alongside the flags array in the HyperCache:
+
+```json
+{
+  "flags": [...],
+  "evaluation_context": {
+    "dependency_stages": [[3], [2], [1]],
+    "flags_with_missing_deps": [5],
+    "transitive_deps": {"1": [2, 3], "2": [3]}
+  }
+}
+```
+
+- `dependency_stages`: Flag IDs pre-grouped by evaluation stage. Stage 0 (no deps) first.
+- `flags_with_missing_deps`: Flag IDs with missing, cyclic, or transitively broken dependencies (fail closed).
+- `transitive_deps`: Flag ID → transitive dependency flag IDs. Keys are stringified ints (JSON requirement).
+
+Rust deserializes `EvaluationContext` and maps pre-grouped stages directly to `Vec<Vec<FeatureFlag>>` — no graph construction or Kahn's algorithm needed.
+
+#### Fallback path (PostgreSQL)
+
+When `evaluation_context` is absent (PG fallback, old cache entries), the service builds a DAG using `petgraph`:
 
 1. Extract dependencies from all flag property filters
 2. Build a directed graph (edges from dependent -> dependency)
 3. Detect and remove cycles (cycle-starting nodes and all their dependents are removed)
 4. Track missing dependencies (flags depending on non-existent flags)
 5. Compute topological evaluation stages using Kahn's algorithm
+
+#### Backwards compatibility
+
+The two paths are fully compatible via `#[serde(default)]` on `evaluation_context`:
+
+- **Old Rust + new cache**: `evaluation_context` is an unknown field, ignored. Falls back to petgraph.
+- **New Rust + old cache**: `evaluation_context` absent → `None` → falls back to petgraph.
+- **New Rust + new cache**: `evaluation_context` present → fast pre-computed path.
 
 ### Evaluation stages
 
@@ -386,7 +431,7 @@ Property overrides from the request body are merged on top of DB-fetched propert
 
 The evaluation engine follows a lazy-but-batched approach:
 
-1. **Flag definitions**: Fetched once per request from HyperCache (Redis -> S3 -> PostgreSQL)
+1. **Flag definitions**: Fetched once per request from HyperCache (Redis -> S3 -> PostgreSQL), including pre-computed `evaluation_context` when available
 2. **Group type mappings**: Fetched once per request if any flag uses groups
 3. **Person properties**: Fetched once per request from PostgreSQL, merged with request overrides
 4. **Group properties**: Fetched once per request from PostgreSQL, merged with request overrides
@@ -397,19 +442,19 @@ The evaluation engine follows a lazy-but-batched approach:
 
 ## Related files
 
-| File                                                         | Purpose                                         |
-| ------------------------------------------------------------ | ----------------------------------------------- |
-| `rust/feature-flags/src/handler/evaluation.rs`               | Entry point: creates matcher and calls evaluate |
-| `rust/feature-flags/src/flags/flag_matching.rs`              | Core matching engine: `FeatureFlagMatcher`      |
-| `rust/feature-flags/src/flags/flag_matching_utils.rs`        | Hash calculation, property fetching, DB queries |
-| `rust/feature-flags/src/properties/property_matching.rs`     | Property filter operator implementations        |
-| `rust/feature-flags/src/flags/flag_models.rs`                | Data models                                     |
-| `rust/feature-flags/src/flags/flag_operations.rs`            | Flag helper methods, `DependencyProvider` trait |
-| `rust/feature-flags/src/flags/flag_match_reason.rs`          | Match reason enum with priority ordering        |
-| `rust/feature-flags/src/utils/graph_utils.rs`                | Dependency graph using petgraph                 |
-| `rust/feature-flags/src/cohorts/cohort_cache_manager.rs`     | Moka-backed cohort cache                        |
-| `rust/feature-flags/src/flags/test_flag_matching.rs`         | Unit tests for flag matching                    |
-| `rust/feature-flags/tests/test_flag_matching_consistency.rs` | Cross-language consistency tests                |
+| File                                                         | Purpose                                             |
+| ------------------------------------------------------------ | --------------------------------------------------- |
+| `rust/feature-flags/src/handler/evaluation.rs`               | Entry point: creates matcher and calls evaluate     |
+| `rust/feature-flags/src/flags/flag_matching.rs`              | Core matching engine: `FeatureFlagMatcher`          |
+| `rust/feature-flags/src/flags/flag_matching_utils.rs`        | Hash calculation, property fetching, DB queries     |
+| `rust/feature-flags/src/properties/property_matching.rs`     | Property filter operator implementations            |
+| `rust/feature-flags/src/flags/flag_models.rs`                | Data models                                         |
+| `rust/feature-flags/src/flags/flag_operations.rs`            | Flag helper methods, `DependencyProvider` trait     |
+| `rust/feature-flags/src/flags/flag_match_reason.rs`          | Match reason enum with priority ordering            |
+| `rust/feature-flags/src/utils/graph_utils.rs`                | Dependency graph (pre-computed + petgraph fallback) |
+| `rust/feature-flags/src/cohorts/cohort_cache_manager.rs`     | Moka-backed cohort cache                            |
+| `rust/feature-flags/src/flags/test_flag_matching.rs`         | Unit tests for flag matching                        |
+| `rust/feature-flags/tests/test_flag_matching_consistency.rs` | Cross-language consistency tests                    |
 
 ## See also
 

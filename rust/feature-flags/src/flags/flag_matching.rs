@@ -1086,9 +1086,6 @@ impl FeatureFlagMatcher {
                     evaluation_runtime: None,
                     evaluation_tags: None,
                     bucketing_identifier: None,
-                    direct_dependency_flag_ids: None,
-                    dependency_flag_ids: None,
-                    has_missing_dependencies: None,
                 };
                 (stub, Err(FlagError::BatchEvaluationPanicked))
             })

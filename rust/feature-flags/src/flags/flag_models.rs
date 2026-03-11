@@ -1,12 +1,26 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::properties::property_models::PropertyFilter;
+
+/// Pre-computed dependency metadata, built by Django at cache-write time.
+/// Shipped as a top-level field alongside the flags array in the hypercache.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EvaluationContext {
+    /// Flag IDs grouped by evaluation stage. Stage 0 (no deps) first.
+    pub dependency_stages: Vec<Vec<i32>>,
+    /// Flag IDs with missing, cyclic, or transitively broken dependencies.
+    pub flags_with_missing_deps: Vec<i32>,
+    /// Flag ID (stringified) → transitive dependency flag IDs.
+    pub transitive_deps: HashMap<String, Vec<i32>>,
+}
 
 /// Wrapper struct for deserializing hypercache format: {"flags": [...]}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HypercacheFlagsWrapper {
     pub flags: Vec<FeatureFlag>,
+    #[serde(default)]
+    pub evaluation_context: Option<EvaluationContext>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -112,18 +126,6 @@ pub struct FeatureFlag {
     pub evaluation_tags: Option<Vec<String>>,
     #[serde(default)]
     pub bucketing_identifier: Option<String>,
-    /// Pre-computed sorted list of direct dependency flag IDs.
-    /// Computed by Django at cache-write time. `None` means old cache format.
-    #[serde(default)]
-    pub direct_dependency_flag_ids: Option<Vec<i32>>,
-    /// Pre-computed sorted list of all transitive dependency flag IDs.
-    /// Computed by Django at cache-write time. `None` means old cache format.
-    #[serde(default)]
-    pub dependency_flag_ids: Option<Vec<i32>>,
-    /// Pre-computed flag indicating missing, cyclic, or transitively broken deps.
-    /// Computed by Django at cache-write time. `None` means old cache format.
-    #[serde(default)]
-    pub has_missing_dependencies: Option<bool>,
 }
 
 impl FeatureFlag {
@@ -164,4 +166,9 @@ pub struct FeatureFlagList {
     /// Not serialized — this is a request-scoped concern, not a cache concern.
     #[serde(skip)]
     pub filtered_out_flag_ids: HashSet<i32>,
+    /// Pre-computed dependency metadata from Django's hypercache.
+    /// Present when the cache was written by new Django code; absent for PG fallback
+    /// or old cache entries.
+    #[serde(skip)]
+    pub evaluation_context: Option<EvaluationContext>,
 }

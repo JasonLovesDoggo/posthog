@@ -180,6 +180,7 @@ pub async fn fetch_and_filter(
     Ok(FeatureFlagList {
         flags,
         filtered_out_flag_ids,
+        ..Default::default()
     })
 }
 
@@ -311,9 +312,6 @@ mod tests {
             evaluation_runtime,
             evaluation_tags,
             bucketing_identifier: None,
-            direct_dependency_flag_ids: None,
-            dependency_flag_ids: None,
-            has_missing_dependencies: None,
         }
     }
 

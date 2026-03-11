@@ -93,6 +93,62 @@ else:
 
 ETags are computed as SHA256 hashes of the JSON content.
 
+## Service cache (Rust)
+
+The feature-flags Rust evaluation service uses a separate HyperCache instance defined in `posthog/models/feature_flag/flags_cache.py`. Unlike the local evaluation cache (which serves SDKs with cohort definitions and group type mappings), the service cache provides raw flag data plus pre-computed dependency metadata so the Rust service can evaluate flags in the correct order without recomputing the dependency graph on every request.
+
+### Cache instance
+
+```python
+# posthog/models/feature_flag/flags_cache.py
+flags_hypercache = HyperCache(
+    namespace="feature_flags",
+    value="flags.json",
+    load_fn=lambda key: _get_feature_flags_for_service(HyperCache.team_from_key(key)),
+    cache_ttl=settings.FLAGS_CACHE_TTL,
+    cache_miss_ttl=settings.FLAGS_CACHE_MISS_TTL,
+    cache_alias=FLAGS_DEDICATED_CACHE_ALIAS if FLAGS_DEDICATED_CACHE_ALIAS in settings.CACHES else None,
+    batch_load_fn=_get_feature_flags_for_teams_batch,
+    expiry_sorted_set_key=FLAGS_CACHE_EXPIRY_SORTED_SET,
+)
+```
+
+The `_get_feature_flags_for_service` function fetches all active, non-deleted flags for a team (excluding encrypted remote config flags) and returns the cache payload.
+
+### Cache payload structure
+
+```json
+{
+  "flags": [
+    /* serialized flag dicts */
+  ],
+  "evaluation_context": {
+    "dependency_stages": [[1, 5], [3], [7]],
+    "flags_with_missing_deps": [9, 12],
+    "transitive_deps": { "3": [1, 5], "7": [1, 3, 5] }
+  }
+}
+```
+
+The `evaluation_context` fields:
+
+| Field                     | Type                   | Description                                                                                                                                                                                 |
+| ------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dependency_stages`       | `list[list[int]]`      | Flag IDs grouped by evaluation order. Stage 0 contains flags with no dependencies; stage N depends only on flags in stages 0…N-1. Flags within the same stage can be evaluated in parallel. |
+| `flags_with_missing_deps` | `list[int]`            | Flag IDs whose dependencies are missing, cyclic, or transitively broken. The Rust service treats these as evaluation errors.                                                                |
+| `transitive_deps`         | `dict[str, list[int]]` | Map of stringified flag ID to the sorted list of all its transitive dependency flag IDs.                                                                                                    |
+
+### Dependency computation
+
+The `_compute_flag_dependencies` function in `flags_cache.py` builds the evaluation context using an iterative DFS with three-state cycle detection (`UNVISITED` → `IN_PROGRESS` → `DONE`). The algorithm:
+
+1. Extracts direct dependencies from each flag's `filters.groups[*].properties` where `type == "flag"`.
+2. Runs iterative DFS over all flags, computing the transitive closure of dependencies.
+3. Detects cycles — any flag encountered while `IN_PROGRESS` is marked as cycled and added to `flags_with_missing_deps`.
+4. Assigns each non-cycled flag to a stage: `max(stage of direct deps) + 1`, with stage 0 for flags that have no dependencies.
+
+The iterative approach (explicit stack instead of recursion) avoids hitting Python's recursion limit for deep dependency chains.
+
 ## Local evaluation caching
 
 Feature flag local evaluation uses two separate HyperCache instances in `posthog/models/feature_flag/local_evaluation.py`:
@@ -415,7 +471,7 @@ REMOTE_CONFIG_CDN_PURGE_DOMAINS=["cdn.example.com"]
 
 - `posthog/storage/hypercache.py` - Core HyperCache implementation
 - `posthog/models/feature_flag/local_evaluation.py` - Local evaluation caching
-- `posthog/models/feature_flag/flags_cache.py` - Flags cache, signal handlers, verification
+- `posthog/models/feature_flag/flags_cache.py` - Flags cache, signal handlers, verification, dependency computation
 - `posthog/storage/hypercache_manager.py` - Batch management operations (warm, invalidate, stats)
 - `posthog/caching/flags_redis_cache.py` - Dual-write pattern for dedicated Redis
 - `posthog/models/remote_config.py` - Remote config caching

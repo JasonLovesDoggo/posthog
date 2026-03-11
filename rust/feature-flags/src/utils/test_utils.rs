@@ -819,9 +819,6 @@ pub fn create_test_flag(
         evaluation_runtime: Some("all".to_string()),
         evaluation_tags: None,
         bucketing_identifier: None,
-        direct_dependency_flag_ids: None,
-        dependency_flag_ids: None,
-        has_missing_dependencies: None,
     }
 }
 

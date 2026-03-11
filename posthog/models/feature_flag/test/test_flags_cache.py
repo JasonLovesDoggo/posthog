@@ -50,7 +50,14 @@ class TestServiceFlagsCache(BaseTest):
         """Test fetching flags when team has no flags."""
         result = _get_feature_flags_for_service(self.team)
 
-        assert result == {"flags": []}
+        assert result == {
+            "flags": [],
+            "evaluation_context": {
+                "dependency_stages": [],
+                "flags_with_missing_deps": [],
+                "transitive_deps": {},
+            },
+        }
 
     def test_get_feature_flags_for_service_with_flags(self):
         """Test fetching flags returns correct format for service."""
@@ -2320,11 +2327,11 @@ class TestExtractDirectDependencyIds:
 class TestComputeFlagDependencies:
     def test_no_dependencies(self):
         flags = [_make_flag(1, "flag_a"), _make_flag(2, "flag_b")]
-        _compute_flag_dependencies(flags)
-        for flag in flags:
-            assert flag["direct_dependency_flag_ids"] == []
-            assert flag["dependency_flag_ids"] == []
-            assert flag["has_missing_dependencies"] is False
+        ctx = _compute_flag_dependencies(flags)
+
+        assert ctx["dependency_stages"] == [[1, 2]]
+        assert ctx["flags_with_missing_deps"] == []
+        assert ctx["transitive_deps"] == {"1": [], "2": []}
 
     def test_linear_chain(self):
         # A(1) -> B(2) -> C(3)
@@ -2333,18 +2340,11 @@ class TestComputeFlagDependencies:
             _make_flag(2, "flag_b", deps=[3]),
             _make_flag(3, "flag_c"),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == [2]
-        assert by_id[1]["dependency_flag_ids"] == [2, 3]
-        assert by_id[1]["has_missing_dependencies"] is False
-        assert by_id[2]["direct_dependency_flag_ids"] == [3]
-        assert by_id[2]["dependency_flag_ids"] == [3]
-        assert by_id[2]["has_missing_dependencies"] is False
-        assert by_id[3]["direct_dependency_flag_ids"] == []
-        assert by_id[3]["dependency_flag_ids"] == []
-        assert by_id[3]["has_missing_dependencies"] is False
+        assert ctx["dependency_stages"] == [[3], [2], [1]]
+        assert ctx["flags_with_missing_deps"] == []
+        assert ctx["transitive_deps"] == {"1": [2, 3], "2": [3], "3": []}
 
     def test_diamond(self):
         # A(1) -> B(2), C(3); B(2) -> D(4); C(3) -> D(4)
@@ -2354,44 +2354,33 @@ class TestComputeFlagDependencies:
             _make_flag(3, "flag_c", deps=[4]),
             _make_flag(4, "flag_d"),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == [2, 3]
-        assert by_id[1]["dependency_flag_ids"] == [2, 3, 4]
-        assert by_id[1]["has_missing_dependencies"] is False
-        assert by_id[2]["direct_dependency_flag_ids"] == [4]
-        assert by_id[2]["dependency_flag_ids"] == [4]
-        assert by_id[2]["has_missing_dependencies"] is False
-        assert by_id[3]["direct_dependency_flag_ids"] == [4]
-        assert by_id[3]["dependency_flag_ids"] == [4]
-        assert by_id[3]["has_missing_dependencies"] is False
-        assert by_id[4]["direct_dependency_flag_ids"] == []
-        assert by_id[4]["dependency_flag_ids"] == []
-        assert by_id[4]["has_missing_dependencies"] is False
+        assert ctx["dependency_stages"] == [[4], [2, 3], [1]]
+        assert ctx["flags_with_missing_deps"] == []
+        assert ctx["transitive_deps"] == {"1": [2, 3, 4], "2": [4], "3": [4], "4": []}
 
     def test_missing_dependency(self):
         # A(1) -> 999 (missing)
         flags = [_make_flag(1, "flag_a", deps=[999])]
-        _compute_flag_dependencies(flags)
+        ctx = _compute_flag_dependencies(flags)
 
-        assert flags[0]["direct_dependency_flag_ids"] == [999]
-        assert flags[0]["dependency_flag_ids"] == []
-        assert flags[0]["has_missing_dependencies"] is True
+        assert ctx["dependency_stages"] == [[1]]
+        assert ctx["flags_with_missing_deps"] == [1]
+        assert ctx["transitive_deps"] == {"1": []}
 
     def test_cycle_both_flags_marked(self):
         # A(1) -> B(2) -> A(1)
+        # DFS detects A(1) as cycled (back-edge target). B(2) is not in cycled_flags
+        # but has_missing because its dep A(1) is cycled. B(2) gets stage 0.
         flags = [
             _make_flag(1, "flag_a", deps=[2]),
             _make_flag(2, "flag_b", deps=[1]),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == [2]
-        assert by_id[1]["has_missing_dependencies"] is True
-        assert by_id[2]["direct_dependency_flag_ids"] == [1]
-        assert by_id[2]["has_missing_dependencies"] is True
+        assert ctx["dependency_stages"] == [[2]]
+        assert ctx["flags_with_missing_deps"] == [1, 2]
 
     def test_transitive_missing_propagation(self):
         # A(1) -> B(2) -> 999 (missing)
@@ -2399,13 +2388,10 @@ class TestComputeFlagDependencies:
             _make_flag(1, "flag_a", deps=[2]),
             _make_flag(2, "flag_b", deps=[999]),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == [2]
-        assert by_id[1]["has_missing_dependencies"] is True
-        assert by_id[2]["direct_dependency_flag_ids"] == [999]
-        assert by_id[2]["has_missing_dependencies"] is True
+        assert ctx["flags_with_missing_deps"] == [1, 2]
+        assert ctx["dependency_stages"] == [[2], [1]]
 
     def test_inactive_flag_empty_deps(self):
         # Inactive A(1) has a dep on B(2), but since inactive, deps should be empty
@@ -2413,12 +2399,9 @@ class TestComputeFlagDependencies:
             _make_flag(1, "flag_a", deps=[2], active=False),
             _make_flag(2, "flag_b"),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == []
-        assert by_id[1]["dependency_flag_ids"] == []
-        assert by_id[1]["has_missing_dependencies"] is False
+        assert ctx["dependency_stages"] == [[1, 2]]
 
     def test_dependency_on_inactive_flag_not_missing(self):
         # A(1) -> inactive B(2). B exists so dependency is valid, but B evaluates to false.
@@ -2426,45 +2409,41 @@ class TestComputeFlagDependencies:
             _make_flag(1, "flag_a", deps=[2]),
             _make_flag(2, "flag_b", active=False),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == [2]
-        assert by_id[1]["dependency_flag_ids"] == [2]
-        assert by_id[1]["has_missing_dependencies"] is False
+        assert ctx["dependency_stages"] == [[2], [1]]
+        assert ctx["flags_with_missing_deps"] == []
 
     def test_self_cycle(self):
         # A(1) -> A(1)
         flags = [_make_flag(1, "flag_a", deps=[1])]
-        _compute_flag_dependencies(flags)
+        ctx = _compute_flag_dependencies(flags)
 
-        assert flags[0]["direct_dependency_flag_ids"] == [1]
-        assert flags[0]["has_missing_dependencies"] is True
+        assert ctx["dependency_stages"] == []
+        assert ctx["flags_with_missing_deps"] == [1]
 
     def test_three_node_cycle(self):
         # A(1) -> B(2) -> C(3) -> A(1), plus D(4) -> A(1) gets transitively marked
+        # DFS detects A(1) as cycled (back-edge target). C(3) and B(2) are not in
+        # cycled_flags but have has_missing=True because they transitively depend on
+        # a cycled flag. D(4) depends on cycled A(1) so also has_missing=True.
         flags = [
             _make_flag(1, "flag_a", deps=[2]),
             _make_flag(2, "flag_b", deps=[3]),
             _make_flag(3, "flag_c", deps=[1]),
             _make_flag(4, "flag_d", deps=[1]),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["direct_dependency_flag_ids"] == [2]
-        assert by_id[1]["has_missing_dependencies"] is True
-        assert by_id[2]["direct_dependency_flag_ids"] == [3]
-        assert by_id[2]["has_missing_dependencies"] is True
-        assert by_id[3]["direct_dependency_flag_ids"] == [1]
-        assert by_id[3]["has_missing_dependencies"] is True
-        assert by_id[4]["direct_dependency_flag_ids"] == [1]
-        assert by_id[4]["has_missing_dependencies"] is True
+        assert ctx["dependency_stages"] == [[3, 4], [2]]
+        assert ctx["flags_with_missing_deps"] == [1, 2, 3, 4]
 
     def test_empty_flags_list(self):
-        flags: list[dict] = []
-        _compute_flag_dependencies(flags)
-        assert flags == []
+        ctx = _compute_flag_dependencies([])
+
+        assert ctx["dependency_stages"] == []
+        assert ctx["flags_with_missing_deps"] == []
+        assert ctx["transitive_deps"] == {}
 
     def test_partial_missing_branch(self):
         # A(1) -> 999 (missing), B(2) -> C(3) (valid)
@@ -2473,32 +2452,37 @@ class TestComputeFlagDependencies:
             _make_flag(2, "flag_b", deps=[3]),
             _make_flag(3, "flag_c"),
         ]
-        _compute_flag_dependencies(flags)
-        by_id = {f["id"]: f for f in flags}
+        ctx = _compute_flag_dependencies(flags)
 
-        assert by_id[1]["has_missing_dependencies"] is True
-        assert by_id[2]["has_missing_dependencies"] is False
-        assert by_id[3]["has_missing_dependencies"] is False
+        assert ctx["flags_with_missing_deps"] == [1]
+        assert ctx["dependency_stages"] == [[1, 3], [2]]
 
 
 @override_settings(FLAGS_REDIS_URL="redis://test")
 class TestComputeFlagDependenciesIntegration(BaseTest):
     def test_get_feature_flags_for_service_includes_dependency_fields(self):
-        FeatureFlag.objects.create(
+        flag = FeatureFlag.objects.create(
             team=self.team,
             key="flag-a",
             created_by=self.user,
             filters={"groups": [{"properties": [], "rollout_percentage": 100}]},
         )
         result = _get_feature_flags_for_service(self.team)
-        flag_data = result["flags"][0]
 
-        assert "direct_dependency_flag_ids" in flag_data
-        assert "dependency_flag_ids" in flag_data
-        assert "has_missing_dependencies" in flag_data
-        assert flag_data["direct_dependency_flag_ids"] == []
-        assert flag_data["dependency_flag_ids"] == []
-        assert flag_data["has_missing_dependencies"] is False
+        assert "evaluation_context" in result
+        ctx = result["evaluation_context"]
+        assert "dependency_stages" in ctx
+        assert "flags_with_missing_deps" in ctx
+        assert "transitive_deps" in ctx
+        assert ctx["dependency_stages"] == [[flag.id]]
+        assert ctx["flags_with_missing_deps"] == []
+        assert ctx["transitive_deps"] == {str(flag.id): []}
+
+        # Per-flag fields should not exist
+        flag_data = result["flags"][0]
+        assert "direct_dependency_flag_ids" not in flag_data
+        assert "dependency_flag_ids" not in flag_data
+        assert "has_missing_dependencies" not in flag_data
 
     def test_batch_includes_dependency_fields(self):
         FeatureFlag.objects.create(
@@ -2508,11 +2492,8 @@ class TestComputeFlagDependenciesIntegration(BaseTest):
             filters={"groups": [{"properties": [], "rollout_percentage": 100}]},
         )
         result = _get_feature_flags_for_teams_batch([self.team])
-        flag_data = result[self.team.id]["flags"][0]
 
-        assert "direct_dependency_flag_ids" in flag_data
-        assert "dependency_flag_ids" in flag_data
-        assert "has_missing_dependencies" in flag_data
+        assert "evaluation_context" in result[self.team.id]
 
     def test_service_computes_transitive_deps(self):
         flag_c = FeatureFlag.objects.create(
@@ -2534,7 +2515,7 @@ class TestComputeFlagDependenciesIntegration(BaseTest):
                 ]
             },
         )
-        FeatureFlag.objects.create(
+        flag_a = FeatureFlag.objects.create(
             team=self.team,
             key="flag-a",
             created_by=self.user,
@@ -2549,11 +2530,9 @@ class TestComputeFlagDependenciesIntegration(BaseTest):
         )
 
         result = _get_feature_flags_for_service(self.team)
-        by_key = {f["key"]: f for f in result["flags"]}
+        ctx = result["evaluation_context"]
 
-        assert by_key["flag-a"]["direct_dependency_flag_ids"] == [flag_b.id]
-        assert sorted(by_key["flag-a"]["dependency_flag_ids"]) == sorted([flag_b.id, flag_c.id])
-        assert by_key["flag-b"]["direct_dependency_flag_ids"] == [flag_c.id]
-        assert by_key["flag-b"]["dependency_flag_ids"] == [flag_c.id]
-        assert by_key["flag-c"]["direct_dependency_flag_ids"] == []
-        assert by_key["flag-c"]["dependency_flag_ids"] == []
+        assert sorted(ctx["transitive_deps"][str(flag_a.id)]) == sorted([flag_b.id, flag_c.id])
+        assert ctx["transitive_deps"][str(flag_b.id)] == [flag_c.id]
+        assert ctx["transitive_deps"][str(flag_c.id)] == []
+        assert ctx["dependency_stages"] == [[flag_c.id], [flag_b.id], [flag_a.id]]
