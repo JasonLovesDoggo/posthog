@@ -5425,6 +5425,7 @@ export interface DataModelingJob {
 export interface SimpleExternalDataSourceSchema {
     id: string
     name: string
+    label: string | null
     should_sync: boolean
     last_synced_at?: Dayjs
 }
@@ -5449,6 +5450,7 @@ export interface IncrementalField {
 
 export interface ExternalDataSourceSyncSchema {
     table: string
+    name?: string
     rows?: number | null
     should_sync: boolean
     sync_time_of_day: string | null
