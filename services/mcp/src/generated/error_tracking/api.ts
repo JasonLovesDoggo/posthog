@@ -1809,6 +1809,10 @@ export const ErrorTrackingSuppressionRulesListResponse = zod.object({
                 .number()
                 .min(errorTrackingSuppressionRulesListResponseResultsItemOrderKeyMin)
                 .max(errorTrackingSuppressionRulesListResponseResultsItemOrderKeyMax),
+            disabled_data: zod.unknown().nullish(),
+            sampling_rate: zod.number().optional(),
+            created_at: zod.string().datetime({}),
+            updated_at: zod.string().datetime({}),
         })
     ),
 })
@@ -1830,6 +1834,8 @@ export const ErrorTrackingSuppressionRulesCreateBody = zod.object({
         .number()
         .min(errorTrackingSuppressionRulesCreateBodyOrderKeyMin)
         .max(errorTrackingSuppressionRulesCreateBodyOrderKeyMax),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
 })
 
 export const ErrorTrackingSuppressionRulesRetrieveParams = zod.object({
@@ -1851,6 +1857,10 @@ export const ErrorTrackingSuppressionRulesRetrieveResponse = zod.object({
         .number()
         .min(errorTrackingSuppressionRulesRetrieveResponseOrderKeyMin)
         .max(errorTrackingSuppressionRulesRetrieveResponseOrderKeyMax),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
+    created_at: zod.string().datetime({}),
+    updated_at: zod.string().datetime({}),
 })
 
 export const ErrorTrackingSuppressionRulesUpdateParams = zod.object({
@@ -1871,6 +1881,8 @@ export const ErrorTrackingSuppressionRulesUpdateBody = zod.object({
         .number()
         .min(errorTrackingSuppressionRulesUpdateBodyOrderKeyMin)
         .max(errorTrackingSuppressionRulesUpdateBodyOrderKeyMax),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
 })
 
 export const errorTrackingSuppressionRulesUpdateResponseOrderKeyMin = -2147483648
@@ -1883,6 +1895,10 @@ export const ErrorTrackingSuppressionRulesUpdateResponse = zod.object({
         .number()
         .min(errorTrackingSuppressionRulesUpdateResponseOrderKeyMin)
         .max(errorTrackingSuppressionRulesUpdateResponseOrderKeyMax),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
+    created_at: zod.string().datetime({}),
+    updated_at: zod.string().datetime({}),
 })
 
 export const ErrorTrackingSuppressionRulesPartialUpdateParams = zod.object({
@@ -1904,6 +1920,8 @@ export const ErrorTrackingSuppressionRulesPartialUpdateBody = zod.object({
         .min(errorTrackingSuppressionRulesPartialUpdateBodyOrderKeyMin)
         .max(errorTrackingSuppressionRulesPartialUpdateBodyOrderKeyMax)
         .optional(),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
 })
 
 export const errorTrackingSuppressionRulesPartialUpdateResponseOrderKeyMin = -2147483648
@@ -1916,6 +1934,10 @@ export const ErrorTrackingSuppressionRulesPartialUpdateResponse = zod.object({
         .number()
         .min(errorTrackingSuppressionRulesPartialUpdateResponseOrderKeyMin)
         .max(errorTrackingSuppressionRulesPartialUpdateResponseOrderKeyMax),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
+    created_at: zod.string().datetime({}),
+    updated_at: zod.string().datetime({}),
 })
 
 export const ErrorTrackingSuppressionRulesDestroyParams = zod.object({
@@ -1945,6 +1967,8 @@ export const ErrorTrackingSuppressionRulesReorderPartialUpdateBody = zod.object(
         .min(errorTrackingSuppressionRulesReorderPartialUpdateBodyOrderKeyMin)
         .max(errorTrackingSuppressionRulesReorderPartialUpdateBodyOrderKeyMax)
         .optional(),
+    disabled_data: zod.unknown().nullish(),
+    sampling_rate: zod.number().optional(),
 })
 
 export const ErrorTrackingSymbolSetsListParams = zod.object({
