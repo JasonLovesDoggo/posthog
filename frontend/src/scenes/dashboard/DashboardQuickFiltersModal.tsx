@@ -69,8 +69,9 @@ export function DashboardQuickFiltersButton({
     const { toggleDashboardFilter, setSelectedDashboardFilterIds } = useActions(selectionLogic)
 
     const handleNewFilterCreated = (filter: { id: string }): void => {
-        if (!selectedDashboardFilterIds.includes(filter.id)) {
-            const newIds = [...selectedDashboardFilterIds, filter.id]
+        const currentIds = selectionLogic.values.selectedDashboardFilterIds
+        if (!currentIds.includes(filter.id)) {
+            const newIds = [...currentIds, filter.id]
             setSelectedDashboardFilterIds(newIds)
             updateDashboard({ quick_filter_ids: newIds })
         }

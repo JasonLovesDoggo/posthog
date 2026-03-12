@@ -1,3 +1,5 @@
+import { useFeatureFlag } from 'lib/hooks/useFeatureFlag'
+
 // AB test metrics (all use existing events, no new instrumentation needed):
 //
 // Primary metric:
@@ -9,5 +11,5 @@
 //   - Filter changes per session: count of 'quick filter selected' per 'viewed dashboard'
 //   - Query efficiency: 'dashboard refreshed' → tiles_refreshed_count and refresh_duration_ms
 export function useDashboardFiltersEnabled(): boolean {
-    return true
+    return useFeatureFlag('DASHBOARD_QUICK_FILTERS_EXPERIMENT', 'test')
 }

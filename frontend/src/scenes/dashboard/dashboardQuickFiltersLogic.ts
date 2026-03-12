@@ -28,7 +28,7 @@ export const dashboardQuickFiltersLogic = kea<dashboardQuickFiltersLogicType>([
                         {
                             type: PropertyFilterType.Event,
                             key: filter.propertyName,
-                            value: filter.value === null ? undefined : filter.value,
+                            value: filter.value,
                             operator: filter.operator,
                         },
                     ])

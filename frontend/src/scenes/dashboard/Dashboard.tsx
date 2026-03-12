@@ -166,7 +166,7 @@ function DashboardScene(): JSX.Element {
                         </LemonBanner>
                     )}
 
-                    {showApplyFiltersBanner && (
+                    {!dashboardFiltersEnabled && showApplyFiltersBanner && (
                         <LemonBanner type="info" className="mb-2">
                             <div className="flex items-center justify-between gap-2">
                                 <span>Filters are not automatically applied on large dashboards.</span>
