@@ -282,7 +282,7 @@ class EventSource(StrEnum):
 AnalyticsProps = TypedDict(
     "AnalyticsProps",
     {
-        "source": Required[str],
+        "source": Required[EventSource],
         "$current_url": NotRequired[str | None],
         "$session_id": NotRequired[str | None],
         "was_impersonated": NotRequired[bool],
