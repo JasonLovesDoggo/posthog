@@ -73,7 +73,7 @@ class TeamTaxonomyQueryRunner(TaxonomyCacheMixin, AnalyticsQueryRunner[TeamTaxon
                 SELECT
                     event,
                     count() as count
-                FROM events
+                FROM ai_events
                 WHERE
                     timestamp >= now () - INTERVAL 30 DAY
                 GROUP BY

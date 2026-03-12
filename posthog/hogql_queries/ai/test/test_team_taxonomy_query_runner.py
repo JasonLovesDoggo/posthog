@@ -28,19 +28,19 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
             team=self.team,
         )
         _create_event(
-            event="event1",
+            event="$ai_generation",
             distinct_id="person1",
             properties={"$browser": "Chrome", "$country": "US"},
             team=self.team,
         )
         _create_event(
-            event="event2",
+            event="$ai_span",
             distinct_id="person1",
             properties={"$browser": "Chrome", "$country": "US"},
             team=self.team,
         )
         _create_event(
-            event="event1",
+            event="$ai_generation",
             distinct_id="person1",
             properties={"$browser": "Chrome", "$country": "US"},
             team=self.team,
@@ -48,9 +48,9 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
 
         results = TeamTaxonomyQueryRunner(team=self.team, query=TeamTaxonomyQuery()).calculate()
         self.assertEqual(len(results.results), 2)
-        self.assertEqual(results.results[0].event, "event1")
+        self.assertEqual(results.results[0].event, "$ai_generation")
         self.assertEqual(results.results[0].count, 2)
-        self.assertEqual(results.results[1].event, "event2")
+        self.assertEqual(results.results[1].event, "$ai_span")
         self.assertEqual(results.results[1].count, 1)
         self.assertFalse(results.hasMore)
         self.assertEqual(results.limit, 500)
@@ -66,7 +66,7 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
                 team=self.team,
             )
             _create_event(
-                event="event1",
+                event="$ai_generation",
                 distinct_id="person1",
                 team=self.team,
             )
@@ -79,7 +79,7 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
 
             key = response.cache_key
             _create_event(
-                event="event2",
+                event="$ai_span",
                 distinct_id="person1",
                 team=self.team,
             )
@@ -109,6 +109,16 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
     def test_limit(self):
         now = timezone.now()
 
+        ai_event_types = [
+            "$ai_generation",
+            "$ai_span",
+            "$ai_trace",
+            "$ai_embedding",
+            "$ai_metric",
+            "$ai_feedback",
+            "$ai_evaluation",
+        ]
+
         _create_person(
             distinct_ids=["person1"],
             properties={"email": "person1@example.com"},
@@ -118,7 +128,7 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
         for i in range(501):
             with freeze_time(now + timedelta(minutes=i)):
                 _create_event(
-                    event=f"event{i}",
+                    event=ai_event_types[i % len(ai_event_types)],
                     distinct_id="person1",
                     team=self.team,
                 )
@@ -129,19 +139,28 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
         response = runner.run()
 
         assert isinstance(response, CachedTeamTaxonomyQueryResponse)
-        self.assertEqual(len(response.results), 500)
-        self.assertTrue(response.hasMore)
+        self.assertEqual(len(response.results), len(ai_event_types))
 
     def test_pagination_with_limit_and_offset(self):
+        ai_event_types = [
+            "$ai_generation",
+            "$ai_span",
+            "$ai_trace",
+            "$ai_embedding",
+            "$ai_metric",
+            "$ai_feedback",
+            "$ai_evaluation",
+        ]
+
         _create_person(
             distinct_ids=["person1"],
             properties={"email": "person1@example.com"},
             team=self.team,
         )
 
-        for i in range(10):
+        for event_type in ai_event_types:
             _create_event(
-                event=f"event{i}",
+                event=event_type,
                 distinct_id="person1",
                 team=self.team,
             )
@@ -149,33 +168,44 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
         flush_persons_and_events()
 
         # First page
-        runner = TeamTaxonomyQueryRunner(team=self.team, query=TeamTaxonomyQuery(limit=5, offset=0))
+        runner = TeamTaxonomyQueryRunner(team=self.team, query=TeamTaxonomyQuery(limit=3, offset=0))
         response = runner.run()
 
         assert isinstance(response, CachedTeamTaxonomyQueryResponse)
-        self.assertEqual(len(response.results), 5)
+        self.assertEqual(len(response.results), 3)
         self.assertTrue(response.hasMore)
-        self.assertEqual(response.limit, 5)
+        self.assertEqual(response.limit, 3)
         self.assertEqual(response.offset, 0)
 
         first_page_events = {r.event for r in response.results}
 
         # Second page
-        runner = TeamTaxonomyQueryRunner(team=self.team, query=TeamTaxonomyQuery(limit=5, offset=5))
+        runner = TeamTaxonomyQueryRunner(team=self.team, query=TeamTaxonomyQuery(limit=3, offset=3))
         response = runner.run()
 
         assert isinstance(response, CachedTeamTaxonomyQueryResponse)
-        self.assertEqual(len(response.results), 5)
-        self.assertFalse(response.hasMore)
-        self.assertEqual(response.limit, 5)
-        self.assertEqual(response.offset, 5)
+        self.assertEqual(len(response.results), 3)
+        self.assertTrue(response.hasMore)
+        self.assertEqual(response.limit, 3)
+        self.assertEqual(response.offset, 3)
 
         second_page_events = {r.event for r in response.results}
 
+        # Third page (1 remaining)
+        runner = TeamTaxonomyQueryRunner(team=self.team, query=TeamTaxonomyQuery(limit=3, offset=6))
+        response = runner.run()
+
+        assert isinstance(response, CachedTeamTaxonomyQueryResponse)
+        self.assertEqual(len(response.results), 1)
+        self.assertFalse(response.hasMore)
+
+        third_page_events = {r.event for r in response.results}
+
         # No overlap between pages
         self.assertEqual(len(first_page_events & second_page_events), 0)
+        self.assertEqual(len(second_page_events & third_page_events), 0)
         # All events covered
-        self.assertEqual(len(first_page_events | second_page_events), 10)
+        self.assertEqual(len(first_page_events | second_page_events | third_page_events), len(ai_event_types))
 
     def test_events_not_useful_for_llm_ignored(self):
         _create_person(
@@ -185,13 +215,13 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
         )
         for _i in range(2):
             _create_event(
-                event="$pageview",
+                event="$ai_generation",
                 distinct_id="person1",
                 properties={"$browser": "Chrome", "$country": "US"},
                 team=self.team,
             )
         _create_event(
-            event="did custom thing",
+            event="$ai_span",
             distinct_id="person1",
             properties={"$browser": "Chrome", "$country": "US"},
             team=self.team,
@@ -222,4 +252,4 @@ class TestTeamTaxonomyQueryRunner(ClickhouseTestMixin, APIBaseTest):
         response = runner.run()
 
         assert isinstance(response, CachedTeamTaxonomyQueryResponse)
-        self.assertEqual([result.event for result in response.results], ["$pageview", "did custom thing"])
+        self.assertEqual([result.event for result in response.results], ["$ai_generation", "$ai_span"])

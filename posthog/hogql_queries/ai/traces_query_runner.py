@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from functools import cached_property
 from typing import Any, cast
-from uuid import UUID
 
 import orjson
 import structlog
@@ -24,6 +23,7 @@ from posthog.hogql.property import property_to_expr
 from posthog.hogql.query import execute_hogql_query
 
 from posthog.clickhouse.query_tagging import Product, tags_context
+from posthog.hogql_queries.ai.utils import merge_heavy_properties
 from posthog.hogql_queries.insights.paginators import HogQLHasMorePaginator
 from posthog.hogql_queries.query_runner import AnalyticsQueryRunner
 from posthog.hogql_queries.utils.query_date_range import QueryDateRange
@@ -69,7 +69,9 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
             offset=self.query.offset,
         )
 
-    def _get_trace_ids(self) -> tuple[list[str], datetime | None, datetime | None]:
+    def _get_trace_ids(
+        self, from_clause: str = "ai_events", exclude_trace_ids: list[str] | None = None
+    ) -> tuple[list[str], datetime | None, datetime | None]:
         """Execute a separate query to get relevant trace IDs and their time range."""
         with self.timings.measure("traces_query_trace_ids_execute"), tags_context(product=Product.LLM_ANALYTICS):
             # Calculate max number of events needed with current offset and limit
@@ -92,10 +94,10 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
                     max(last_ts) as max_timestamp
                 FROM (
                     SELECT
-                        properties.$ai_trace_id as trace_id,
+                        trace_id,
                         min(timestamp) as first_ts,
                         max(timestamp) as last_ts
-                    FROM events
+                    FROM {from_clause}
                     WHERE event IN ('$ai_span', '$ai_generation', '$ai_embedding', '$ai_metric', '$ai_feedback', '$ai_trace')
                       AND {{conditions}}
                     GROUP BY trace_id
@@ -105,13 +107,15 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
                 """,
             )
 
+            placeholders: dict[str, ast.Expr] = {
+                "conditions": self._get_subquery_filter(exclude_trace_ids=exclude_trace_ids),
+                "limit": ast.Constant(value=pagination_limit),
+            }
+
             trace_ids_result = execute_hogql_query(
                 query_type="TracesQuery_TraceIds",
                 query=trace_ids_query,
-                placeholders={
-                    "conditions": self._get_subquery_filter(),
-                    "limit": ast.Constant(value=pagination_limit),
-                },
+                placeholders=placeholders,
                 team=self.team,
                 timings=self.timings,
                 modifiers=self.modifiers,
@@ -129,9 +133,40 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
 
             return trace_ids, min_timestamp, max_timestamp
 
+    def _resolve_from_clauses(self) -> tuple[str, str]:
+        """Return (primary, fallback) table clauses.
+
+        Always try ai_events first since it has dedicated columns. The
+        EVENTS_AS_AI_EVENTS fallback only covers data that predates the
+        dual-write and was never written to ai_events.
+        """
+        from posthog.hogql_queries.ai.events_fallback import EVENTS_AS_AI_EVENTS
+
+        return "ai_events", EVENTS_AS_AI_EVENTS
+
     def _calculate(self):
-        # First, get the trace IDs and time range
-        trace_ids, min_timestamp, max_timestamp = self._get_trace_ids()
+        primary_clause, fallback_clause = self._resolve_from_clauses()
+
+        # Get trace IDs from the primary table
+        trace_ids, min_timestamp, max_timestamp = self._get_trace_ids(from_clause=primary_clause)
+
+        # Supplement from fallback table if primary didn't fill the page
+        pagination_limit = self.paginator.limit + self.paginator.offset + 1
+        used_fallback = False
+        if len(trace_ids) < pagination_limit:
+            remaining = pagination_limit - len(trace_ids)
+            extra_ids, extra_min, extra_max = self._get_trace_ids(
+                from_clause=fallback_clause,
+                exclude_trace_ids=trace_ids,
+            )
+            extra_ids = extra_ids[:remaining]
+            if extra_ids:
+                used_fallback = True
+                trace_ids = trace_ids + extra_ids
+                if extra_min is not None:
+                    min_timestamp = min(min_timestamp, extra_min) if min_timestamp else extra_min
+                if extra_max is not None:
+                    max_timestamp = max(max_timestamp, extra_max) if max_timestamp else extra_max
 
         # If no trace IDs found, return empty results
         if not trace_ids:
@@ -150,9 +185,16 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
         # Create a narrowed date range if we have timestamps
         narrowed_date_range = self._create_narrowed_date_range(min_timestamp, max_timestamp)
 
+        # When mixing tables, use EVENTS_AS_AI_EVENTS so both old and new data resolve
+        from_clause = primary_clause
+        if used_fallback:
+            from posthog.hogql_queries.ai.events_fallback import EVENTS_AS_AI_EVENTS
+
+            from_clause = EVENTS_AS_AI_EVENTS
+
         with self.timings.measure("traces_query_hogql_execute"), tags_context(product=Product.LLM_ANALYTICS):
             query_result = self.paginator.execute_hogql_query(
-                query=self._to_query_with_trace_ids(trace_ids),
+                query=self._to_query_with_trace_ids(trace_ids, from_clause=from_clause),
                 placeholders={
                     "filter_conditions": self._get_where_clause(date_range=narrowed_date_range),
                 },
@@ -184,17 +226,19 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
 
         return self._to_query_with_trace_ids(self._trace_ids)
 
-    def _to_query_with_trace_ids(self, trace_ids: list[str]) -> ast.SelectQuery | ast.SelectSetQuery:
+    def _to_query_with_trace_ids(
+        self, trace_ids: list[str], from_clause: str = "ai_events"
+    ) -> ast.SelectQuery | ast.SelectSetQuery:
         """Internal method that builds the query with specific trace IDs."""
         # Separate query to build the trace IDs tuple for the IN clause
         # Without using a tuple, the data skipping index is not used
         trace_ids_tuple = ast.Tuple(exprs=[ast.Constant(value=tid) for tid in trace_ids])
 
         query = parse_select(
-            """
+            f"""
             SELECT
-                properties.$ai_trace_id AS id,
-                any(properties.$ai_session_id) AS ai_session_id,
+                trace_id AS id,
+                any(session_id) AS ai_session_id,
                 min(timestamp) AS first_timestamp,
                 ifNull(
                     nullIf(argMinIf(distinct_id, timestamp, event = '$ai_trace'), ''),
@@ -203,66 +247,67 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
                 round(
                     CASE
                         -- If all events with latency are generations, sum them all
-                        WHEN countIf(toFloat(properties.$ai_latency) > 0 AND event != '$ai_generation') = 0
-                             AND countIf(toFloat(properties.$ai_latency) > 0 AND event = '$ai_generation') > 0
-                        THEN sumIf(toFloat(properties.$ai_latency),
-                                   event = '$ai_generation' AND toFloat(properties.$ai_latency) > 0
+                        WHEN countIf(latency > 0 AND event != '$ai_generation') = 0
+                             AND countIf(latency > 0 AND event = '$ai_generation') > 0
+                        THEN sumIf(latency,
+                                   event = '$ai_generation' AND latency > 0
                              )
                         -- Otherwise sum the direct children of the trace
-                        ELSE sumIf(toFloat(properties.$ai_latency),
-                                   properties.$ai_parent_id IS NULL
-                                   OR toString(properties.$ai_parent_id) = toString(properties.$ai_trace_id)
+                        ELSE sumIf(latency,
+                                   parent_id = ''
+                                   OR parent_id = trace_id
                              )
                     END, 2
                 ) AS total_latency,
-                sumIf(toFloat(properties.$ai_input_tokens),
+                sumIf(input_tokens,
                       event IN ('$ai_generation', '$ai_embedding')
                 ) AS input_tokens,
-                sumIf(toFloat(properties.$ai_output_tokens),
+                sumIf(output_tokens,
                       event IN ('$ai_generation', '$ai_embedding')
                 ) AS output_tokens,
                 round(
-                    sumIf(toFloat(properties.$ai_input_cost_usd),
+                    sumIf(input_cost_usd,
                           event IN ('$ai_generation', '$ai_embedding')
                     ), 10
                 ) AS input_cost,
                 round(
-                    sumIf(toFloat(properties.$ai_output_cost_usd),
+                    sumIf(output_cost_usd,
                           event IN ('$ai_generation', '$ai_embedding')
                     ), 10
                 ) AS output_cost,
                 round(
-                    sumIf(toFloat(properties.$ai_total_cost_usd),
+                    sumIf(total_cost_usd,
                           event IN ('$ai_generation', '$ai_embedding')
                     ), 10
                 ) AS total_cost,
                 arrayDistinct(
                     arraySort(x -> x.3,
                         groupArrayIf(
-                            tuple(uuid, event, timestamp, properties),
-                            event IN ('$ai_metric', '$ai_feedback') OR toString(properties.$ai_parent_id) = toString(properties.$ai_trace_id)
+                            tuple(uuid, event, timestamp, properties,
+                                  input, output, output_choices, input_state, output_state, tools),
+                            event IN ('$ai_metric', '$ai_feedback') OR parent_id = trace_id
                         )
                     )
                 ) AS events,
-                argMinIf(properties.$ai_input_state,
+                argMinIf(input_state,
                          timestamp, event = '$ai_trace'
                 ) AS input_state,
-                argMinIf(properties.$ai_output_state,
+                argMinIf(output_state,
                          timestamp, event = '$ai_trace'
                 ) AS output_state,
                 ifNull(
                     argMinIf(
-                        ifNull(properties.$ai_span_name, properties.$ai_trace_name),
+                        ifNull(nullIf(span_name, ''), nullIf(trace_name, '')),
                         timestamp,
                         event = '$ai_trace'
                     ),
                     argMin(
-                        ifNull(properties.$ai_span_name, properties.$ai_trace_name),
+                        ifNull(nullIf(span_name, ''), nullIf(trace_name, '')),
                         timestamp,
                     )
                 ) AS trace_name,
                 countIf(
-                    isNotNull(properties.$ai_error) OR properties.$ai_is_error = 'true'
+                    is_error = 1
                 ) AS error_count,
                 any(properties.ai_support_impersonated) AS is_support_trace,
                 arrayFilter(
@@ -281,12 +326,12 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
                         )
                     )
                 ) AS tools
-            FROM events
+            FROM {from_clause}
             WHERE event IN (
                 '$ai_span', '$ai_generation', '$ai_embedding', '$ai_metric', '$ai_feedback', '$ai_trace'
             )
-              AND {filter_conditions}
-            GROUP BY properties.$ai_trace_id
+              AND {{filter_conditions}}
+            GROUP BY trace_id
             ORDER BY first_timestamp DESC
             """,
         )
@@ -296,7 +341,7 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
 
         trace_id_filter = ast.CompareOperation(
             op=ast.CompareOperationOp.In,
-            left=ast.Field(chain=["properties", "$ai_trace_id"]),
+            left=ast.Field(chain=["trace_id"]),
             right=trace_ids_tuple,
         )
 
@@ -311,7 +356,7 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
         return {
             **super().get_cache_payload(),
             # When the response schema changes, increment this version to invalidate the cache.
-            "schema_version": 5,
+            "schema_version": 6,
         }
 
     @cached_property
@@ -377,8 +422,8 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
         }
 
         generations = []
-        for uuid, event_name, timestamp, properties in result["events"]:
-            generations.append(self._map_event(uuid, event_name, timestamp, properties))
+        for event_tuple in result["events"]:
+            generations.append(self._map_event(event_tuple))
 
         trace_dict = {
             **result,
@@ -386,7 +431,8 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
             "events": generations,
         }
         for raw_key, parsed_key in [("input_state", "input_state_parsed"), ("output_state", "output_state_parsed")]:
-            raw = trace_dict.get(raw_key)
+            raw = trace_dict.get(raw_key) or None
+            trace_dict[raw_key] = raw
             if raw is not None:
                 try:
                     trace_dict[parsed_key] = orjson.loads(raw)
@@ -398,27 +444,35 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
         )
         return trace
 
-    def _map_event(
-        self, event_uuid: UUID, event_name: str, event_timestamp: datetime, event_properties: str
-    ) -> LLMTraceEvent:
+    def _map_event(self, event_tuple: tuple) -> LLMTraceEvent:
+        event_uuid, event_name, event_timestamp, event_properties, *heavy = event_tuple
+        heavy_columns = dict(zip(("input", "output", "output_choices", "input_state", "output_state", "tools"), heavy))
         generation: dict[str, Any] = {
             "id": str(event_uuid),
             "event": event_name,
             "createdAt": event_timestamp.isoformat(),
-            "properties": orjson.loads(event_properties),
+            "properties": merge_heavy_properties(event_properties, heavy_columns),
         }
         return LLMTraceEvent.model_validate(generation)
 
-    def _get_subquery_filter(self) -> ast.Expr:
+    def _get_subquery_filter(self, exclude_trace_ids: list[str] | None = None) -> ast.Expr:
         exprs: list[ast.Expr] = [
-            ast.Call(name="isNotNull", args=[ast.Field(chain=["properties", "$ai_trace_id"])]),
             ast.CompareOperation(
                 op=ast.CompareOperationOp.NotEq,
-                left=ast.Field(chain=["properties", "$ai_trace_id"]),
+                left=ast.Field(chain=["trace_id"]),
                 right=ast.Constant(value=""),
             ),
             self._get_where_clause(),
         ]
+
+        if exclude_trace_ids:
+            exprs.append(
+                ast.CompareOperation(
+                    op=ast.CompareOperationOp.NotIn,
+                    left=ast.Field(chain=["trace_id"]),
+                    right=ast.Tuple(exprs=[ast.Constant(value=tid) for tid in exclude_trace_ids]),
+                )
+            )
 
         properties_filter = self._get_properties_filter()
         if properties_filter is not None:
@@ -437,7 +491,7 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
             exprs.append(
                 ast.CompareOperation(
                     op=ast.CompareOperationOp.Eq,
-                    left=ast.Field(chain=[f"$group_{self.query.groupTypeIndex}"]),
+                    left=ast.Field(chain=["properties", f"$group_{self.query.groupTypeIndex}"]),
                     right=ast.Constant(value=self.query.groupKey),
                 )
             )
@@ -463,12 +517,12 @@ class TracesQueryRunner(AnalyticsQueryRunner[TracesQueryResponse]):
         where_exprs: list[ast.Expr] = [
             ast.CompareOperation(
                 op=ast.CompareOperationOp.GtEq,
-                left=ast.Field(chain=["events", "timestamp"]),
+                left=ast.Field(chain=["ai_events", "timestamp"]),
                 right=effective_date_range.date_from_as_hogql(),
             ),
             ast.CompareOperation(
                 op=ast.CompareOperationOp.LtEq,
-                left=ast.Field(chain=["events", "timestamp"]),
+                left=ast.Field(chain=["ai_events", "timestamp"]),
                 right=effective_date_range.date_to_as_hogql(),
             ),
         ]
