@@ -11873,6 +11873,8 @@ export namespace Schemas {
        */
       order_key: number;
       disabled_data?: unknown | null;
+      readonly created_at: string;
+      readonly updated_at: string;
     }
 
     export type ErrorTrackingBreakdownsQueryKind = typeof ErrorTrackingBreakdownsQueryKind[keyof typeof ErrorTrackingBreakdownsQueryKind];
@@ -11944,12 +11946,15 @@ export namespace Schemas {
       readonly id: string;
       filters: unknown;
       readonly assignee: string;
+      readonly issue: string;
       /**
        * @minimum -2147483648
        * @maximum 2147483647
        */
       order_key: number;
       disabled_data?: unknown | null;
+      readonly created_at: string;
+      readonly updated_at: string;
     }
 
     export interface ErrorTrackingIssueAssignment {
@@ -19974,6 +19979,8 @@ export namespace Schemas {
        */
       order_key?: number;
       disabled_data?: unknown | null;
+      readonly created_at?: string;
+      readonly updated_at?: string;
     }
 
     export interface PatchedErrorTrackingExternalReference {
@@ -19989,12 +19996,15 @@ export namespace Schemas {
       readonly id?: string;
       filters?: unknown;
       readonly assignee?: string;
+      readonly issue?: string;
       /**
        * @minimum -2147483648
        * @maximum 2147483647
        */
       order_key?: number;
       disabled_data?: unknown | null;
+      readonly created_at?: string;
+      readonly updated_at?: string;
     }
 
     export interface PatchedErrorTrackingIssueFull {
