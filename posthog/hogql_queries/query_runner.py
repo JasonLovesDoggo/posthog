@@ -22,11 +22,6 @@ import posthoganalytics
 from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict
 
-from posthog.errors import clickhouse_error_type
-
-if TYPE_CHECKING:
-    from rest_framework.request import Request
-
 from posthog.schema import (
     ActorsPropertyTaxonomyQuery,
     ActorsQuery,
@@ -105,7 +100,11 @@ from posthog.clickhouse.client.limit import (
     get_org_app_concurrency_limit,
 )
 from posthog.clickhouse.query_tagging import get_query_tag_value, tag_queries
-from posthog.event_usage import groups, report_user_or_team_action
+from posthog.errors import clickhouse_error_type
+from posthog.event_usage import AnalyticsProps, groups, report_user_or_team_action
+
+if TYPE_CHECKING:
+    from rest_framework.request import Request
 from posthog.exceptions_capture import capture_exception
 from posthog.hogql_queries.query_cache import count_query_cache_hit
 from posthog.hogql_queries.query_cache_base import QueryCacheManagerBase
@@ -1095,6 +1094,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
         cache_manager: QueryCacheManagerBase,
         refresh_requested: bool = False,
         user: Optional[User] = None,
+        analytics_props: Optional[AnalyticsProps] = None,
     ) -> QueryStatus:
         posthoganalytics.capture(
             distinct_id=user.distinct_id if user else str(self.team.uuid),
@@ -1121,6 +1121,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
             refresh_requested=refresh_requested,
             is_query_service=self.is_query_service,
             is_posthog_ai=self.limit_context == LimitContext.POSTHOG_AI,
+            analytics_props=analytics_props,
         )
 
     def get_async_query_status(self, *, cache_key: str) -> Optional[QueryStatus]:
@@ -1134,7 +1135,11 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
             return None
 
     def handle_cache_and_async_logic(
-        self, execution_mode: ExecutionMode, cache_manager: QueryCacheManagerBase, user: Optional[User] = None
+        self,
+        execution_mode: ExecutionMode,
+        cache_manager: QueryCacheManagerBase,
+        user: Optional[User] = None,
+        analytics_props: Optional[AnalyticsProps] = None,
     ) -> Optional[CR | CacheMissResponse]:
         CachedResponse: type[CR] = self.cached_response_type
         cached_response: CR | CacheMissResponse
@@ -1189,7 +1194,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
             ):
                 # We're allowed to calculate, but we'll do it asynchronously and attach the query status
                 cached_response.query_status = self.enqueue_async_calculation(
-                    cache_manager=cache_manager, user=user, refresh_requested=True
+                    cache_manager=cache_manager, user=user, refresh_requested=True, analytics_props=analytics_props
                 )
                 return cached_response
             elif execution_mode == ExecutionMode.EXTENDED_CACHE_CALCULATE_ASYNC_IF_STALE:
@@ -1197,7 +1202,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
                 assert isinstance(cached_response, CachedResponse)
                 if self._is_stale(last_refresh=last_refresh_from_cached_result(cached_response), lazy=True):
                     cached_response.query_status = self.enqueue_async_calculation(
-                        cache_manager=cache_manager, user=user
+                        cache_manager=cache_manager, user=user, analytics_props=analytics_props
                     )
                 cached_response.query_status = self.get_async_query_status(cache_key=cache_manager.cache_key)
                 return cached_response
@@ -1213,7 +1218,9 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
                 ExecutionMode.EXTENDED_CACHE_CALCULATE_ASYNC_IF_STALE,
             ):
                 # We're allowed to calculate, but we'll do it asynchronously
-                cached_response.query_status = self.enqueue_async_calculation(cache_manager=cache_manager, user=user)
+                cached_response.query_status = self.enqueue_async_calculation(
+                    cache_manager=cache_manager, user=user, analytics_props=analytics_props
+                )
                 return cached_response
 
         # Nothing useful out of cache, nor async query status
@@ -1272,6 +1279,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
         insight_id: Optional[int] = None,
         dashboard_id: Optional[int] = None,
         cache_age_seconds: Optional[int] = None,
+        analytics_props: Optional[AnalyticsProps] = None,
     ) -> CR | CacheMissResponse | QueryStatusResponse:
         # Set user for access control during query execution
         if user is not None:
@@ -1339,13 +1347,19 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
                 # We should always kick off async calculation and disregard the cache
                 return QueryStatusResponse(
                     query_status=self.enqueue_async_calculation(
-                        refresh_requested=True, cache_manager=cache_manager, user=user
+                        refresh_requested=True,
+                        cache_manager=cache_manager,
+                        user=user,
+                        analytics_props=analytics_props,
                     )
                 )
             elif execution_mode != ExecutionMode.CALCULATE_BLOCKING_ALWAYS:
                 # Let's look in the cache first
                 results = self.handle_cache_and_async_logic(
-                    execution_mode=execution_mode, cache_manager=cache_manager, user=user
+                    execution_mode=execution_mode,
+                    cache_manager=cache_manager,
+                    user=user,
+                    analytics_props=analytics_props,
                 )
                 if results:
                     cache_tracking_props = {}
@@ -1383,7 +1397,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
                         user=user,
                         team=self.team,
                         organization=self.team.organization,
-                        request=self.request,
+                        analytics_props=analytics_props,
                     )
 
                     return results
@@ -1471,7 +1485,7 @@ class QueryRunner(ABC, Generic[Q, R, CR]):
                 user=user,
                 team=self.team,
                 organization=self.team.organization,
-                request=self.request,
+                analytics_props=analytics_props,
             )
 
             return CachedResponse(**fresh_response_dict)

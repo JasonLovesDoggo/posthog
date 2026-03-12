@@ -4,7 +4,7 @@ Module to centralize event reporting on the server-side.
 
 import re
 from enum import StrEnum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, NotRequired, Optional, Required, TypedDict
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -273,7 +273,27 @@ class EventSource(StrEnum):
     TERRAFORM = "terraform"
     MCP = "mcp"
     WIZARD = "wizard"
+    CACHE_WARMING = "cache_warming"
+    ALERT = "alert"
+    EXPORT = "export"
+    SUBSCRIPTION = "subscription"
 
+
+AnalyticsProps = TypedDict(
+    "AnalyticsProps",
+    {
+        "source": Required[str],
+        "$current_url": NotRequired[str | None],
+        "$session_id": NotRequired[str | None],
+        "was_impersonated": NotRequired[bool],
+        "mcp_user_agent": NotRequired[str | None],
+        "mcp_client_name": NotRequired[str | None],
+        "mcp_client_version": NotRequired[str | None],
+        "mcp_protocol_version": NotRequired[str | None],
+        "mcp_oauth_client_name": NotRequired[str | None],
+    },
+    total=False,
+)
 
 _POSTHOG_CODE_UA_RE = re.compile(r"posthog/(code|[\w.-]+\.hog\.dev)")
 
@@ -319,7 +339,7 @@ def get_mcp_properties(request) -> dict[str, str | None]:
     }
 
 
-def get_request_analytics_properties(request) -> dict[str, str | bool | None]:
+def get_request_analytics_properties(request) -> AnalyticsProps:
     """Extract standard analytics properties from a request."""
     return {
         "source": get_event_source(request),
@@ -338,14 +358,19 @@ def report_user_action(
     team: Optional[Team] = None,
     organization: Optional[Organization] = None,
     request: Optional["Request"] = None,
+    analytics_props: Optional[AnalyticsProps] = None,
 ):
     # isinstance works through Django's SimpleLazyObject because it proxies __class__
     if not isinstance(user, User) or not user.distinct_id:
         return
+    if request is not None and analytics_props is not None:
+        raise ValueError("Pass either request or analytics_props, not both")
     if properties is None:
         properties = {}
     if request is not None:
         properties = {**get_request_analytics_properties(request), **properties}
+    if analytics_props is not None:
+        properties = {**analytics_props, **properties}
     posthoganalytics.capture(
         distinct_id=user.distinct_id,
         event=event,
@@ -361,12 +386,12 @@ def report_user_or_team_action(
     user: Optional[User | AnonymousUser] = None,
     team: Optional[Team] = None,
     organization: Optional[Organization] = None,
-    request: Optional["Request"] = None,
+    analytics_props: Optional[AnalyticsProps] = None,
 ):
     if properties is None:
         properties = {}
-    if request is not None:
-        properties = {**get_request_analytics_properties(request), **properties}
+    if analytics_props is not None:
+        properties = {**analytics_props, **properties}
 
     # isinstance works through Django's SimpleLazyObject because it proxies __class__
     real_user = user if isinstance(user, User) else None
