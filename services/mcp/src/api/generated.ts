@@ -15314,6 +15314,7 @@ export namespace Schemas {
     * `google-cloud-storage` - Google Cloud Storage
     * `google-ads` - Google Ads
     * `google-sheets` - Google Sheets
+    * `google-cloud-service-account` - Google Cloud Service Account
     * `snapchat` - Snapchat
     * `linkedin-ads` - Linkedin Ads
     * `reddit-ads` - Reddit Ads
@@ -15334,10 +15335,10 @@ export namespace Schemas {
     * `jira` - Jira
     * `pinterest-ads` - Pinterest Ads
      */
-    export type Kind439Enum = typeof Kind439Enum[keyof typeof Kind439Enum];
+    export type Kind25bEnum = typeof Kind25bEnum[keyof typeof Kind25bEnum];
 
 
-    export const Kind439Enum = {
+    export const Kind25bEnum = {
       Slack: 'slack',
       SlackTwig: 'slack-twig',
       Salesforce: 'salesforce',
@@ -15346,6 +15347,7 @@ export namespace Schemas {
       GoogleCloudStorage: 'google-cloud-storage',
       GoogleAds: 'google-ads',
       GoogleSheets: 'google-sheets',
+      GoogleCloudServiceAccount: 'google-cloud-service-account',
       Snapchat: 'snapchat',
       LinkedinAds: 'linkedin-ads',
       RedditAds: 'reddit-ads',
@@ -15372,7 +15374,7 @@ export namespace Schemas {
      */
     export interface Integration {
       readonly id: number;
-      kind: Kind439Enum;
+      kind: Kind25bEnum;
       config?: unknown;
       readonly created_at: string;
       readonly created_by: UserBasic;
@@ -20824,7 +20826,7 @@ export namespace Schemas {
      */
     export interface PatchedIntegration {
       readonly id?: number;
-      kind?: Kind439Enum;
+      kind?: Kind25bEnum;
       config?: unknown;
       readonly created_at?: string;
       readonly created_by?: UserBasic;
@@ -21578,7 +21580,7 @@ export namespace Schemas {
      */
     export interface SessionRecordingExternalReferenceIntegration {
       readonly id: number;
-      readonly kind: Kind439Enum;
+      readonly kind: Kind25bEnum;
       readonly display_name: string;
     }
 
