@@ -156,7 +156,7 @@ export function DashboardAdvancedOptions(): JSX.Element | null {
         dashboardMode,
         hasVariables,
         effectiveEditBarFilters,
-        showEditBarApplyPopover,
+        showApplyFiltersBanner,
         loadingPreview,
         cancellingPreview,
         hasUrlFilters,
@@ -184,7 +184,7 @@ export function DashboardAdvancedOptions(): JSX.Element | null {
 
     return (
         <Popover
-            visible={showEditBarApplyPopover}
+            visible={showApplyFiltersBanner}
             overlay={
                 <div className="flex items-center gap-2 m-1">
                     <LemonButton

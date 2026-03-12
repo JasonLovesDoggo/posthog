@@ -1019,7 +1019,7 @@ export const dashboardLogic = kea<dashboardLogicType>([
             (externalFilters, urlFilters, scopedQuickFilters) => {
                 const combined = combineDashboardFilters(externalFilters, urlFilters)
                 if (scopedQuickFilters.length > 0) {
-                    combined.properties = [...(combined.properties || []), ...scopedQuickFilters]
+                    return { ...combined, properties: [...(combined.properties || []), ...scopedQuickFilters] }
                 }
                 return combined
             },
@@ -1052,7 +1052,7 @@ export const dashboardLogic = kea<dashboardLogicType>([
                     urlFilters
                 )
                 if (scopedQuickFilters.length > 0) {
-                    combined.properties = [...(combined.properties || []), ...scopedQuickFilters]
+                    return { ...combined, properties: [...(combined.properties || []), ...scopedQuickFilters] }
                 }
                 return combined
             },
@@ -2144,21 +2144,13 @@ export const dashboardLogic = kea<dashboardLogicType>([
                 actions.setDashboardMode(DashboardMode.Edit, null)
             }
         },
-        [quickFiltersSectionLogic({ context: QuickFilterContext.Dashboards }).actionTypes.setQuickFilterValue]: () => {
-            // Quick filters always auto-refresh, regardless of dashboard size
-            // This makes them "quick" - unlike normal filters which require manual apply on large dashboards
-            actions.refreshDashboardItems({
-                action: RefreshDashboardItemsAction.Preview,
-                forceRefresh: false,
-            })
-        },
-        [quickFiltersSectionLogic({ context: QuickFilterContext.Dashboards }).actionTypes.clearQuickFilter]: () => {
-            // Quick filters always auto-refresh, regardless of dashboard size
-            actions.refreshDashboardItems({
-                action: RefreshDashboardItemsAction.Preview,
-                forceRefresh: false,
-            })
-        },
+        [quickFiltersSectionLogic({ context: QuickFilterContext.Dashboards }).actionTypes.quickFiltersCommitted]:
+            () => {
+                actions.refreshDashboardItems({
+                    action: RefreshDashboardItemsAction.Preview,
+                    forceRefresh: false,
+                })
+            },
         [variableDataLogic.actionTypes.getVariablesSuccess]: () => {
             // Only run this handler once on startup
             // This ensures variables are loaded before the dashboard is loaded and insights are refreshed

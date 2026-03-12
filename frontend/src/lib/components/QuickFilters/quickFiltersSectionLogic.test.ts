@@ -342,4 +342,63 @@ describe('quickFiltersSectionLogic', () => {
                 })
         })
     })
+
+    describe('quickFiltersCommitted debounce', () => {
+        it('commits immediately when only one filter exists', async () => {
+            // Override mock to return a single filter
+            useMocks({
+                get: {
+                    '/api/environments/:team_id/quick_filters/': {
+                        results: [mockQuickFilters[0]],
+                    },
+                },
+            })
+            const singleFilterLogic = quickFiltersSectionLogic({
+                context: QuickFilterContext.ErrorTrackingIssueFilters,
+                logicKey: 'single',
+            })
+            singleFilterLogic.mount()
+            quickFiltersLogic({
+                context: QuickFilterContext.ErrorTrackingIssueFilters,
+            }).mount()
+
+            await expectLogic(singleFilterLogic, () => {
+                singleFilterLogic.actions.setQuickFilterValue('filter-1', '$environment', mockOption1)
+            }).toDispatchActions(['setQuickFilterValue', 'quickFiltersChanged', 'quickFiltersCommitted'])
+        })
+
+        it('debounces commit when multiple filters exist', async () => {
+            // Ensure quick filters are loaded so values.quickFilters.length > 1
+            const filtersLogic = quickFiltersLogic({ context: QuickFilterContext.ErrorTrackingIssueFilters })
+            await expectLogic(filtersLogic).toDispatchActions(['loadQuickFiltersSuccess'])
+
+            jest.useFakeTimers()
+            const chromeOption = mockQuickFilters[1].options[0]
+
+            // Fire two changes rapidly
+            logic.actions.setQuickFilterValue('filter-1', '$environment', mockOption1)
+            logic.actions.setQuickFilterValue('filter-2', '$browser', chromeOption)
+
+            // Not committed yet
+            await expectLogic(logic).toNotHaveDispatchedActions(['quickFiltersCommitted'])
+
+            // Advance past debounce window
+            jest.advanceTimersByTime(300)
+
+            // Now committed (once)
+            await expectLogic(logic).toDispatchActions(['quickFiltersCommitted'])
+
+            jest.useRealTimers()
+        })
+
+        it('commits after clearQuickFilter', async () => {
+            await expectLogic(logic, () => {
+                logic.actions.setQuickFilterValue('filter-1', '$environment', mockOption1)
+            }).toDispatchActions(['quickFiltersCommitted'])
+
+            await expectLogic(logic, () => {
+                logic.actions.clearQuickFilter('filter-1')
+            }).toDispatchActions(['quickFiltersCommitted'])
+        })
+    })
 })

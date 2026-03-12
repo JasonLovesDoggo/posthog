@@ -1,7 +1,7 @@
 import { useActions, useValues } from 'kea'
-import { actions, kea, path, props, reducers, selectors } from 'kea'
+import { actions, kea, key, path, props, reducers, selectors } from 'kea'
 
-import { IconFilter } from '@posthog/icons'
+import { IconGear } from '@posthog/icons'
 import { LemonButton, LemonModal, lemonToast } from '@posthog/lemon-ui'
 
 import { QuickFilterForm } from 'lib/components/QuickFilters/QuickFilterForm'
@@ -15,9 +15,12 @@ export interface DashboardQuickFiltersSelectionLogicProps {
     dashboard: DashboardType<any>
 }
 
+const EMPTY_FILTER_IDS: string[] = []
+
 export const dashboardQuickFiltersSelectionLogic = kea([
     path(['scenes', 'dashboard', 'dashboardQuickFiltersSelectionLogic']),
     props({} as DashboardQuickFiltersSelectionLogicProps),
+    key((props) => props.dashboard.id),
 
     actions({
         toggleDashboardFilter: (filterId: string) => ({ filterId }),
@@ -26,7 +29,7 @@ export const dashboardQuickFiltersSelectionLogic = kea([
 
     reducers(({ props }) => ({
         selectedDashboardFilterIds: [
-            props.dashboard.quick_filter_ids ?? [],
+            props.dashboard.quick_filter_ids ?? EMPTY_FILTER_IDS,
             {
                 toggleDashboardFilter: (state: string[], { filterId }: { filterId: string }) =>
                     state.includes(filterId) ? state.filter((id: string) => id !== filterId) : [...state, filterId],
@@ -37,7 +40,7 @@ export const dashboardQuickFiltersSelectionLogic = kea([
 
     selectors({
         hasDashboardSelectionChanges: [
-            (s, p) => [s.selectedDashboardFilterIds, () => p.dashboard.quick_filter_ids ?? []],
+            (s, p) => [s.selectedDashboardFilterIds, () => p.dashboard.quick_filter_ids ?? EMPTY_FILTER_IDS],
             (selectedIds: string[], dashboardIds: string[]): boolean => {
                 if (selectedIds.length !== dashboardIds.length) {
                     return true
@@ -61,20 +64,9 @@ export function DashboardQuickFiltersButton({
     dashboard,
     updateDashboard,
 }: DashboardQuickFiltersButtonProps): JSX.Element {
-    const modalLogicProps = { context, modalKey: dashboard.id }
-    const modalLogic = quickFiltersModalLogic(modalLogicProps)
-    const { openModal, closeModal } = useActions(modalLogic)
-    const { isModalOpen, view, modalTitle } = useValues(modalLogic)
-
     const selectionLogic = dashboardQuickFiltersSelectionLogic({ dashboard })
     const { selectedDashboardFilterIds, hasDashboardSelectionChanges } = useValues(selectionLogic)
     const { toggleDashboardFilter, setSelectedDashboardFilterIds } = useActions(selectionLogic)
-
-    const handleSaveSelection = (): void => {
-        updateDashboard({ quick_filter_ids: selectedDashboardFilterIds })
-        lemonToast.success('Dashboard quick filters updated')
-        closeModal()
-    }
 
     const handleNewFilterCreated = (filter: { id: string }): void => {
         if (!selectedDashboardFilterIds.includes(filter.id)) {
@@ -84,15 +76,21 @@ export function DashboardQuickFiltersButton({
         }
     }
 
-    // Wire the generic modal logic's callback to auto-select newly created filters
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useActions(quickFiltersModalLogic({ context, modalKey: dashboard.id, onNewFilterCreated: handleNewFilterCreated }))
+    const modalLogic = quickFiltersModalLogic({ context, onNewFilterCreated: handleNewFilterCreated })
+    const { openModal, closeModal } = useActions(modalLogic)
+    const { isModalOpen, view, modalTitle } = useValues(modalLogic)
+
+    const handleSaveSelection = (): void => {
+        updateDashboard({ quick_filter_ids: selectedDashboardFilterIds })
+        lemonToast.success('Dashboard quick filters updated')
+        closeModal()
+    }
 
     return (
         <>
             <LemonButton
                 size="small"
-                icon={<IconFilter />}
+                icon={<IconGear />}
                 onClick={openModal}
                 tooltip="Configure quick filters"
                 aria-label="Configure quick filters"
@@ -101,7 +99,6 @@ export function DashboardQuickFiltersButton({
                 {view === ModalView.List ? (
                     <QuickFiltersModalContent
                         context={context}
-                        modalKey={dashboard.id}
                         selectionColumnConfig={{
                             selectedIds: selectedDashboardFilterIds,
                             onToggleId: toggleDashboardFilter,
@@ -112,7 +109,7 @@ export function DashboardQuickFiltersButton({
                         }}
                     />
                 ) : (
-                    <QuickFilterForm context={context} modalKey={dashboard.id} />
+                    <QuickFilterForm context={context} />
                 )}
             </LemonModal>
         </>
