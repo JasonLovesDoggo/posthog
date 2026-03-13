@@ -85,7 +85,6 @@ def find_personal_api_key(token: str) -> tuple[PersonalAPIKey, str] | None:
                 .filter(user__is_active=True)
                 .get(secure_value=secure_value)
             )
-            PERSONAL_API_KEY_AUTH_COUNTER.labels(hash_mode=mode).inc()
             return obj, mode
 
         except PersonalAPIKey.DoesNotExist:
